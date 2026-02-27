@@ -21,6 +21,19 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Fluent image-processing pipeline that reads an image, applies a sequence of
+ * {@link Operation}s, and writes the result.
+ *
+ * <p>Create instances via the {@link #builder()} method:
+ * <pre>{@code
+ * ImageEditor editor = ImageEditor.builder()
+ *         .resize(800, 600)
+ *         .quality(0.85f)
+ *         .build();
+ * editor.process(inputPath, outputPath);
+ * }</pre>
+ */
 public class ImageEditor {
 
     private final List<Operation> operations;
@@ -31,10 +44,27 @@ public class ImageEditor {
         this.outputOptions = outputOptions;
     }
 
+    /**
+     * Returns a new {@link Builder} for configuring an {@code ImageEditor}.
+     *
+     * @return a fresh builder instance
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Reads the image at {@code inputPath}, applies all configured operations,
+     * and writes the result to {@code outputPath}.
+     *
+     * <p>The output format is determined by the builder's
+     * {@link Builder#outputFormat(ImageFormat)} setting, falling back to the
+     * input file's extension.
+     *
+     * @param inputPath  path to the source image
+     * @param outputPath path where the processed image will be written
+     * @throws ImageEditorException if reading, processing, or writing fails
+     */
     public void process(Path inputPath, Path outputPath) {
         BufferedImage image = ImageIOHandler.read(inputPath);
 
@@ -49,6 +79,19 @@ public class ImageEditor {
         ImageIOHandler.write(image, outputPath, format, outputOptions);
     }
 
+    /**
+     * Reads an image from the given stream, applies all configured operations,
+     * and writes the result to the output stream.
+     *
+     * <p>The input format is auto-detected from magic bytes. The output format
+     * defaults to the detected input format unless overridden via
+     * {@link Builder#outputFormat(ImageFormat)}.
+     *
+     * @param input  stream containing the source image data
+     * @param output stream where the processed image will be written
+     * @throws ImageEditorException if the format cannot be detected or
+     *         processing fails
+     */
     public void process(InputStream input, OutputStream output) {
         BufferedInputStream buffered = input instanceof BufferedInputStream
                 ? (BufferedInputStream) input
@@ -72,10 +115,33 @@ public class ImageEditor {
         ImageIOHandler.write(image, output, format, outputOptions);
     }
 
+    /**
+     * Processes every supported image in {@code inputDir} and writes results to
+     * {@code outputDir}, using a single thread.
+     *
+     * @param inputDir  directory containing source images
+     * @param outputDir directory where processed images will be written
+     *                  (created if it does not exist)
+     * @throws ImageEditorException if the input path is not a directory or
+     *         any image fails to process
+     * @see #processDirectory(Path, Path, int)
+     */
     public void processDirectory(Path inputDir, Path outputDir) {
         processDirectory(inputDir, outputDir, 1);
     }
 
+    /**
+     * Processes every supported image in {@code inputDir} and writes results to
+     * {@code outputDir}, using up to {@code parallelism} threads.
+     *
+     * @param inputDir    directory containing source images
+     * @param outputDir   directory where processed images will be written
+     *                    (created if it does not exist)
+     * @param parallelism maximum number of concurrent processing threads;
+     *                    values &le; 1 result in single-threaded processing
+     * @throws ImageEditorException if the input path is not a directory or
+     *         any image fails to process
+     */
     public void processDirectory(Path inputDir, Path outputDir, int parallelism) {
         if (!Files.isDirectory(inputDir)) {
             throw new ImageEditorException("Input path is not a directory: " + inputDir);
@@ -147,32 +213,72 @@ public class ImageEditor {
         }
     }
 
+    /**
+     * Mutable builder for configuring and constructing an {@link ImageEditor}.
+     */
     public static class Builder {
         private final List<Operation> operations = new ArrayList<>();
         private Float quality;
         private boolean stripMetadata;
         private ImageFormat outputFormat;
 
+        /**
+         * Appends an exact-resize operation to the pipeline.
+         *
+         * @param width  target width in pixels
+         * @param height target height in pixels
+         * @return this builder
+         */
         public Builder resize(int width, int height) {
             operations.add(new ResizeOperation(width, height));
             return this;
         }
 
+        /**
+         * Appends a crop operation to the pipeline.
+         *
+         * @param x      left edge of the crop region
+         * @param y      top edge of the crop region
+         * @param width  width of the crop region in pixels
+         * @param height height of the crop region in pixels
+         * @return this builder
+         */
         public Builder crop(int x, int y, int width, int height) {
             operations.add(new CropOperation(x, y, width, height));
             return this;
         }
 
+        /**
+         * Appends a cover (scale + center-crop) operation to the pipeline.
+         *
+         * @param width  target width in pixels
+         * @param height target height in pixels
+         * @return this builder
+         */
         public Builder cover(int width, int height) {
             operations.add(new CoverOperation(width, height));
             return this;
         }
 
+        /**
+         * Appends a fit (scale-to-fit) operation to the pipeline.
+         *
+         * @param maxWidth  maximum width in pixels
+         * @param maxHeight maximum height in pixels
+         * @return this builder
+         */
         public Builder fit(int maxWidth, int maxHeight) {
             operations.add(new FitOperation(maxWidth, maxHeight));
             return this;
         }
 
+        /**
+         * Sets the compression quality for formats that support it (e.g. JPEG, WebP).
+         *
+         * @param q quality value between 0.0 (lowest) and 1.0 (highest)
+         * @return this builder
+         * @throws IllegalArgumentException if {@code q} is outside [0.0, 1.0] or NaN
+         */
         public Builder quality(float q) {
             if (Float.isNaN(q) || q < 0.0f || q > 1.0f) {
                 throw new IllegalArgumentException("Quality must be between 0.0 and 1.0, got: " + q);
@@ -181,16 +287,34 @@ public class ImageEditor {
             return this;
         }
 
+        /**
+         * Instructs the encoder to strip image metadata from the output.
+         *
+         * @return this builder
+         */
         public Builder stripMetadata() {
             this.stripMetadata = true;
             return this;
         }
 
+        /**
+         * Forces the output format, overriding any format inferred from the
+         * file extension.
+         *
+         * @param format the desired output format, or {@code null} to infer
+         * @return this builder
+         */
         public Builder outputFormat(ImageFormat format) {
             this.outputFormat = format;
             return this;
         }
 
+        /**
+         * Builds an immutable {@link ImageEditor} with the configured
+         * operations and output options.
+         *
+         * @return a new {@code ImageEditor} instance
+         */
         public ImageEditor build() {
             OutputOptions.Builder optBuilder = OutputOptions.builder();
             if (quality != null) {

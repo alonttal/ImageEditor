@@ -8,11 +8,23 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * Detects image formats by inspecting file magic bytes or file extensions.
+ */
 public class FormatDetector {
 
     private FormatDetector() {
     }
 
+    /**
+     * Detects the image format of the file at the given path.
+     *
+     * <p>First attempts detection via magic bytes; falls back to the file
+     * extension if magic-byte detection fails.
+     *
+     * @param path path to the image file
+     * @return the detected format, or {@code null} if detection fails
+     */
     public static ImageFormat detectFormat(Path path) {
         try (InputStream is = Files.newInputStream(path)) {
             ImageFormat detected = detectFromMagicBytes(is);
@@ -28,6 +40,17 @@ public class FormatDetector {
         }
     }
 
+    /**
+     * Detects the image format by inspecting the leading bytes of the stream.
+     *
+     * <p>The stream is marked before reading and reset afterwards, so it can
+     * still be consumed by the caller. If the stream does not support
+     * {@link InputStream#mark(int)}, it is automatically wrapped in a
+     * {@link BufferedInputStream}.
+     *
+     * @param input the image input stream
+     * @return the detected format, or {@code null} if detection fails
+     */
     public static ImageFormat detectFormat(InputStream input) {
         if (!input.markSupported()) {
             input = new BufferedInputStream(input);
@@ -94,11 +117,26 @@ public class FormatDetector {
         return null;
     }
 
+    /**
+     * Returns the {@link ImageFormat} for the given file name based on its
+     * extension.
+     *
+     * @param fileName a file name with an extension (e.g. {@code "photo.png"})
+     * @return the corresponding format
+     * @throws ImageEditorException if the extension is missing or unsupported
+     */
     public static ImageFormat getFormat(String fileName) {
         String ext = getExtension(fileName);
         return ImageFormat.fromExtension(ext);
     }
 
+    /**
+     * Extracts the lower-case file extension from a file name.
+     *
+     * @param fileName a file name (e.g. {@code "photo.PNG"})
+     * @return the extension in lower case (e.g. {@code "png"})
+     * @throws ImageEditorException if the file name has no extension
+     */
     public static String getExtension(String fileName) {
         int dot = fileName.lastIndexOf('.');
         if (dot < 0) {

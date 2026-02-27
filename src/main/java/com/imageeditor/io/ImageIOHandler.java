@@ -13,18 +13,45 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 
+/**
+ * Central facade for reading and writing images in all supported formats.
+ *
+ * <p>Standard formats (PNG, JPEG, GIF, BMP, TIFF) are handled via Java
+ * ImageIO. Non-standard formats (WebP, AVIF) are delegated to external CLI
+ * tools managed by {@link CliToolRunner}.
+ */
 public class ImageIOHandler {
 
+    /**
+     * Sets the directory where external CLI tools (e.g. {@code cwebp},
+     * {@code heif-enc}) are located.
+     *
+     * @param directory path to the tool directory, or {@code null} to
+     *                  resolve tools from the system {@code PATH}
+     */
     public static void setToolDirectory(Path directory) {
         CliToolRunner.setToolDirectory(directory);
     }
 
+    /**
+     * Returns the currently configured CLI tool directory.
+     *
+     * @return the tool directory, or {@code null} if tools are resolved from
+     *         the system {@code PATH}
+     */
     public static Path getToolDirectory() {
         return CliToolRunner.getToolDirectory();
     }
 
     // --- Path-based read/write ---
 
+    /**
+     * Reads an image from the given file path.
+     *
+     * @param path path to the image file
+     * @return the decoded image
+     * @throws ImageEditorException if the format is unsupported or reading fails
+     */
     public static BufferedImage read(Path path) {
         ImageFormat format = getFormat(path.getFileName().toString());
 
@@ -43,15 +70,41 @@ public class ImageIOHandler {
         }
     }
 
+    /**
+     * Writes an image to the given path using default output options and the
+     * format inferred from the file extension.
+     *
+     * @param image the image to write
+     * @param path  destination file path
+     * @throws ImageEditorException if the format is unsupported or writing fails
+     */
     public static void write(BufferedImage image, Path path) {
         write(image, path, OutputOptions.defaults());
     }
 
+    /**
+     * Writes an image to the given path with the specified output options and
+     * the format inferred from the file extension.
+     *
+     * @param image   the image to write
+     * @param path    destination file path
+     * @param options output options (quality, metadata stripping, etc.)
+     * @throws ImageEditorException if the format is unsupported or writing fails
+     */
     public static void write(BufferedImage image, Path path, OutputOptions options) {
         ImageFormat format = getFormat(path.getFileName().toString());
         write(image, path, format, options);
     }
 
+    /**
+     * Writes an image to the given path in the specified format.
+     *
+     * @param image   the image to write
+     * @param path    destination file path
+     * @param format  the image format to encode as
+     * @param options output options (quality, metadata stripping, etc.)
+     * @throws ImageEditorException if the format is unsupported or writing fails
+     */
     public static void write(BufferedImage image, Path path, ImageFormat format, OutputOptions options) {
         try {
             if (format.isStandard()) {
@@ -70,6 +123,17 @@ public class ImageIOHandler {
 
     // --- Stream-based read/write ---
 
+    /**
+     * Reads an image from a stream with an explicit format hint.
+     *
+     * <p>For non-standard formats the stream is spooled to a temp file and
+     * processed via CLI tools.
+     *
+     * @param input  stream containing the image data
+     * @param format the image format of the stream content
+     * @return the decoded image
+     * @throws ImageEditorException if reading fails or the format is unsupported
+     */
     public static BufferedImage read(InputStream input, ImageFormat format) {
         try {
             if (format.isStandard()) {
@@ -96,6 +160,18 @@ public class ImageIOHandler {
         }
     }
 
+    /**
+     * Writes an image to an output stream in the specified format.
+     *
+     * <p>For non-standard formats the image is written to a temp file via CLI
+     * tools and then streamed to the output.
+     *
+     * @param image   the image to write
+     * @param output  destination stream
+     * @param format  the image format to encode as
+     * @param options output options (quality, metadata stripping, etc.)
+     * @throws ImageEditorException if writing fails or the format is unsupported
+     */
     public static void write(BufferedImage image, OutputStream output, ImageFormat format, OutputOptions options) {
         try {
             if (format.isStandard()) {
@@ -120,16 +196,41 @@ public class ImageIOHandler {
 
     // --- Format detection (delegates to FormatDetector) ---
 
+    /**
+     * Detects the image format of the file at the given path.
+     *
+     * @param path path to the image file
+     * @return the detected format, or {@code null} if detection fails
+     * @see FormatDetector#detectFormat(Path)
+     */
     public static ImageFormat detectFormat(Path path) {
         return FormatDetector.detectFormat(path);
     }
 
+    /**
+     * Detects the image format by inspecting the stream's leading bytes.
+     *
+     * <p>The stream is marked and reset so that it can still be read
+     * afterwards.
+     *
+     * @param input an input stream that supports {@link InputStream#mark(int)}
+     * @return the detected format, or {@code null} if detection fails
+     * @see FormatDetector#detectFormat(InputStream)
+     */
     public static ImageFormat detectFormat(InputStream input) {
         return FormatDetector.detectFormat(input);
     }
 
     // --- Format support check (delegates to CliToolRunner) ---
 
+    /**
+     * Returns whether the given format can be read and written on the current
+     * system. Standard formats are always supported; non-standard formats
+     * require their CLI tools to be available.
+     *
+     * @param format the format to check
+     * @return {@code true} if the format is supported
+     */
     public static boolean isFormatSupported(ImageFormat format) {
         return format.isStandard() || CliToolRunner.isCliFormatSupported(format);
     }
@@ -225,10 +326,25 @@ public class ImageIOHandler {
         }
     }
 
+    /**
+     * Returns the {@link ImageFormat} for the given file name based on its
+     * extension.
+     *
+     * @param fileName a file name (e.g. {@code "photo.png"})
+     * @return the corresponding format
+     * @throws ImageEditorException if the extension is missing or unsupported
+     */
     public static ImageFormat getFormat(String fileName) {
         return FormatDetector.getFormat(fileName);
     }
 
+    /**
+     * Extracts the lower-case file extension from a file name.
+     *
+     * @param fileName a file name (e.g. {@code "photo.PNG"})
+     * @return the extension in lower case (e.g. {@code "png"})
+     * @throws ImageEditorException if the file name has no extension
+     */
     public static String getExtension(String fileName) {
         return FormatDetector.getExtension(fileName);
     }

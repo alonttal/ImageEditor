@@ -9,6 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Manages discovery and execution of external CLI tools used to read/write
+ * non-standard image formats (e.g. WebP via {@code cwebp}/{@code dwebp},
+ * AVIF via {@code heif-enc}/{@code heif-dec}).
+ */
 public class CliToolRunner {
 
     private static final Map<ImageFormat, List<String>> CLI_TOOLS = Map.of(
@@ -22,10 +27,22 @@ public class CliToolRunner {
     private CliToolRunner() {
     }
 
+    /**
+     * Sets the directory where external CLI tools are located.
+     *
+     * @param directory path to the tool directory, or {@code null} to resolve
+     *                  tools from the system {@code PATH}
+     */
     public static void setToolDirectory(Path directory) {
         toolDirectory = directory;
     }
 
+    /**
+     * Returns the currently configured CLI tool directory.
+     *
+     * @return the tool directory, or {@code null} if tools are resolved from
+     *         the system {@code PATH}
+     */
     public static Path getToolDirectory() {
         return toolDirectory;
     }
@@ -38,6 +55,13 @@ public class CliToolRunner {
         return toolName;
     }
 
+    /**
+     * Checks whether the CLI tools required for the given non-standard format
+     * are available on the current system.
+     *
+     * @param format the format to check
+     * @return {@code true} if all required CLI tools for the format are found
+     */
     public static boolean isCliFormatSupported(ImageFormat format) {
         List<String> tools = CLI_TOOLS.get(format);
         if (tools == null) {

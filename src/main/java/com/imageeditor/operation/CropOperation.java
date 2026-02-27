@@ -4,6 +4,16 @@ import com.imageeditor.exception.ImageEditorException;
 
 import java.awt.image.BufferedImage;
 
+/**
+ * Extracts a rectangular region from an image.
+ *
+ * @param x      left edge of the crop region (must be non-negative)
+ * @param y      top edge of the crop region (must be non-negative)
+ * @param width  width of the crop region in pixels (must be positive)
+ * @param height height of the crop region in pixels (must be positive)
+ * @throws ImageEditorException if coordinates are negative, dimensions are not
+ *         positive, or the region extends beyond the image bounds at apply time
+ */
 public record CropOperation(int x, int y, int width, int height) implements Operation {
 
     public CropOperation {
