@@ -280,6 +280,175 @@ class ImageIOHandlerTest {
                 "High quality (" + highBaos.size() + ") should be larger than low quality (" + lowBaos.size() + ")");
     }
 
+    // --- Read edge cases ---
+
+    @Test
+    void readNonExistentFile() {
+        Path noFile = tempDir.resolve("nonexistent.png");
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(noFile));
+    }
+
+    @Test
+    void readEmptyFile() throws IOException {
+        Path empty = tempDir.resolve("empty.png");
+        Files.createFile(empty);
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(empty));
+    }
+
+    @Test
+    void readCorruptedFile() throws IOException {
+        Path corrupted = tempDir.resolve("corrupted.png");
+        Files.write(corrupted, new byte[]{0x01, 0x02, 0x03, 0x04, 0x05});
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(corrupted));
+    }
+
+    @Test
+    void readMixedCaseExtension() throws IOException {
+        Path png = createTestImage(20, 20, "png");
+        Path mixed = tempDir.resolve("image.PNG");
+        Files.move(png, mixed);
+        BufferedImage image = ImageIOHandler.read(mixed);
+        assertEquals(20, image.getWidth());
+    }
+
+    // --- Write edge cases ---
+
+    @Test
+    void writeToNonExistentParent() {
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        Path badPath = tempDir.resolve("nonexistent").resolve("output.png");
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.write(img, badPath));
+    }
+
+    @Test
+    void writeOverwritesExisting() throws IOException {
+        Path file = createTestImage(20, 20, "png");
+        BufferedImage bigger = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIOHandler.write(bigger, file);
+
+        BufferedImage result = ImageIO.read(file.toFile());
+        assertEquals(100, result.getWidth());
+    }
+
+    @Test
+    void writeJpegQualityBoundaryValues() throws IOException {
+        BufferedImage image = createRichTestImage(100, 100);
+
+        Path q0 = tempDir.resolve("q0.jpg");
+        Path q1 = tempDir.resolve("q1.jpg");
+
+        ImageIOHandler.write(image, q0, OutputOptions.builder().quality(0.0f).build());
+        ImageIOHandler.write(image, q1, OutputOptions.builder().quality(1.0f).build());
+
+        assertTrue(Files.size(q0) > 0);
+        assertTrue(Files.size(q1) > 0);
+    }
+
+    // --- getExtension edge cases ---
+
+    @Test
+    void getExtensionEmptyFilename() {
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.getExtension(""));
+    }
+
+    @Test
+    void getExtensionDotOnly() {
+        assertEquals("", ImageIOHandler.getExtension("."));
+    }
+
+    @Test
+    void getExtensionMultipleDots() {
+        assertEquals("png", ImageIOHandler.getExtension("image.backup.png"));
+    }
+
+    @Test
+    void getExtensionHiddenFile() {
+        assertEquals("gitignore", ImageIOHandler.getExtension(".gitignore"));
+    }
+
+    // --- detectFormat edge cases ---
+
+    @Test
+    void detectFormatNonExistentFile() {
+        Path noFile = tempDir.resolve("missing.png");
+        assertEquals("png", ImageIOHandler.detectFormat(noFile));
+    }
+
+    @Test
+    void detectFormatNoExtensionNoMagic() throws IOException {
+        Path noExt = tempDir.resolve("noext");
+        Files.write(noExt, new byte[]{0x01, 0x02, 0x03, 0x04});
+        assertNull(ImageIOHandler.detectFormat(noExt));
+    }
+
+    @Test
+    void detectFormatTiff() throws IOException {
+        Path tiff = tempDir.resolve("test.tiff");
+        // TIFF little-endian magic: 49 49 2A 00
+        Files.write(tiff, new byte[]{0x49, 0x49, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+        assertEquals("tiff", ImageIOHandler.detectFormat(tiff));
+    }
+
+    @Test
+    void detectFormatStreamTooShort() {
+        InputStream is = new ByteArrayInputStream(new byte[]{0x01, 0x02});
+        assertNull(ImageIOHandler.detectFormat(is));
+    }
+
+    // --- Stream I/O edge cases ---
+
+    @Test
+    void streamReadWebpWithoutTools() {
+        assumeTrue(!isToolAvailable("dwebp"), "dwebp is installed, skipping");
+        InputStream is = new ByteArrayInputStream(new byte[]{0x01});
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, "webp"));
+    }
+
+    @Test
+    void streamWriteWebpWithoutTools() {
+        assumeTrue(!isToolAvailable("cwebp"), "cwebp is installed, skipping");
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        assertThrows(ImageEditorException.class, () ->
+                ImageIOHandler.write(img, baos, "webp", OutputOptions.defaults()));
+    }
+
+    // --- Tool directory configuration tests ---
+
+    @Test
+    void setToolDirectoryUsesCustomPath() throws IOException {
+        Path fakeDir = tempDir.resolve("tools");
+        Files.createDirectory(fakeDir);
+        try {
+            ImageIOHandler.setToolDirectory(fakeDir);
+            // With a fake directory containing no executables, CLI formats should not be supported
+            assertFalse(ImageIOHandler.isFormatSupported("webp"));
+            assertFalse(ImageIOHandler.isFormatSupported("avif"));
+        } finally {
+            ImageIOHandler.setToolDirectory(null);
+        }
+    }
+
+    @Test
+    void setToolDirectoryNullResetsToDefault() {
+        ImageIOHandler.setToolDirectory(Path.of("/some/fake/path"));
+        ImageIOHandler.setToolDirectory(null);
+        assertNull(ImageIOHandler.getToolDirectory());
+        // Standard formats should still work regardless
+        assertTrue(ImageIOHandler.isFormatSupported("png"));
+    }
+
+    @Test
+    void getToolDirectoryReturnsConfiguredPath() {
+        Path dir = Path.of("/opt/image-tools");
+        try {
+            ImageIOHandler.setToolDirectory(dir);
+            assertEquals(dir, ImageIOHandler.getToolDirectory());
+        } finally {
+            ImageIOHandler.setToolDirectory(null);
+        }
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

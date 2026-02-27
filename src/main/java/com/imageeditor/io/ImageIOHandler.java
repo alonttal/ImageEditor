@@ -26,6 +26,24 @@ public class ImageIOHandler {
     );
     private static final long TIMEOUT_SECONDS = 30;
 
+    private static volatile Path toolDirectory;
+
+    public static void setToolDirectory(Path directory) {
+        toolDirectory = directory;
+    }
+
+    public static Path getToolDirectory() {
+        return toolDirectory;
+    }
+
+    private static String resolveToolPath(String toolName) {
+        Path dir = toolDirectory;
+        if (dir != null) {
+            return dir.resolve(toolName).toString();
+        }
+        return toolName;
+    }
+
     // --- Path-based read/write ---
 
     public static BufferedImage read(Path path) {
@@ -35,9 +53,9 @@ public class ImageIOHandler {
             if (STANDARD_FORMATS.contains(ext)) {
                 return readStandard(path);
             } else if ("webp".equals(ext)) {
-                return readViaCliToPng(path, "dwebp", path.toAbsolutePath().toString(), "-o");
+                return readViaCliToPng(path, resolveToolPath("dwebp"), path.toAbsolutePath().toString(), "-o");
             } else if ("avif".equals(ext)) {
-                return readViaCliToPng(path, "heif-dec", path.toAbsolutePath().toString());
+                return readViaCliToPng(path, resolveToolPath("heif-dec"), path.toAbsolutePath().toString());
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
             }
@@ -57,9 +75,9 @@ public class ImageIOHandler {
             if (STANDARD_FORMATS.contains(ext)) {
                 writeStandard(image, ext, path, options);
             } else if ("webp".equals(ext)) {
-                writeViaCliFromPng(image, path, options, "cwebp", null, "-o", path.toAbsolutePath().toString());
+                writeViaCliFromPng(image, path, options, resolveToolPath("cwebp"), null, "-o", path.toAbsolutePath().toString());
             } else if ("avif".equals(ext)) {
-                writeViaCliFromPng(image, path, options, "heif-enc", null, "-o", path.toAbsolutePath().toString());
+                writeViaCliFromPng(image, path, options, resolveToolPath("heif-enc"), null, "-o", path.toAbsolutePath().toString());
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
             }
@@ -223,6 +241,10 @@ public class ImageIOHandler {
 
     private static boolean isToolAvailable(String tool) {
         try {
+            Path dir = toolDirectory;
+            if (dir != null) {
+                return Files.isExecutable(dir.resolve(tool));
+            }
             String lookupCommand = System.getProperty("os.name", "")
                     .toLowerCase().contains("win") ? "where" : "which";
             Process p = new ProcessBuilder(lookupCommand, tool)
