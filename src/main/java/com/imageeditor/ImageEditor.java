@@ -3,6 +3,7 @@ package com.imageeditor;
 import com.imageeditor.io.ImageIOHandler;
 import com.imageeditor.operation.CoverOperation;
 import com.imageeditor.operation.CropOperation;
+import com.imageeditor.operation.FitOperation;
 import com.imageeditor.operation.Operation;
 import com.imageeditor.operation.ResizeOperation;
 
@@ -49,6 +50,11 @@ public class ImageEditor {
 
         public Builder cover(int width, int height) {
             operations.add(new CoverOperation(width, height));
+            return this;
+        }
+
+        public Builder fit(int maxWidth, int maxHeight) {
+            operations.add(new FitOperation(maxWidth, maxHeight));
             return this;
         }
 
