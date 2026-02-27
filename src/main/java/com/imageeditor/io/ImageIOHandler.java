@@ -14,15 +14,13 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class ImageIOHandler {
 
-    private static final Set<String> STANDARD_FORMATS = Set.of("png", "jpg", "jpeg", "gif", "bmp", "tiff");
-    private static final Map<String, List<String>> CLI_TOOLS = Map.of(
-            "webp", List.of("cwebp", "dwebp"),
-            "avif", List.of("heif-enc", "heif-dec")
+    private static final Map<ImageFormat, List<String>> CLI_TOOLS = Map.of(
+            ImageFormat.WEBP, List.of("cwebp", "dwebp"),
+            ImageFormat.AVIF, List.of("heif-enc", "heif-dec")
     );
     private static final long TIMEOUT_SECONDS = 30;
 
@@ -47,17 +45,17 @@ public class ImageIOHandler {
     // --- Path-based read/write ---
 
     public static BufferedImage read(Path path) {
-        String ext = getExtension(path.getFileName().toString());
+        ImageFormat format = getFormat(path.getFileName().toString());
 
         try {
-            if (STANDARD_FORMATS.contains(ext)) {
+            if (format.isStandard()) {
                 return readStandard(path);
-            } else if ("webp".equals(ext)) {
+            } else if (format == ImageFormat.WEBP) {
                 return readViaCliToPng(path, resolveToolPath("dwebp"), path.toAbsolutePath().toString(), "-o");
-            } else if ("avif".equals(ext)) {
+            } else if (format == ImageFormat.AVIF) {
                 return readViaCliToPng(path, resolveToolPath("heif-dec"), path.toAbsolutePath().toString());
             } else {
-                throw new ImageEditorException("Unsupported image format: " + ext);
+                throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
         } catch (IOException e) {
             throw new ImageEditorException("Failed to read image: " + path, e);
@@ -69,22 +67,20 @@ public class ImageIOHandler {
     }
 
     public static void write(BufferedImage image, Path path, OutputOptions options) {
-        String ext = getExtension(path.getFileName().toString());
-        write(image, path, ext, options);
+        ImageFormat format = getFormat(path.getFileName().toString());
+        write(image, path, format, options);
     }
 
-    public static void write(BufferedImage image, Path path, String format, OutputOptions options) {
-        String ext = format.toLowerCase();
-
+    public static void write(BufferedImage image, Path path, ImageFormat format, OutputOptions options) {
         try {
-            if (STANDARD_FORMATS.contains(ext)) {
-                writeStandard(image, ext, path, options);
-            } else if ("webp".equals(ext)) {
+            if (format.isStandard()) {
+                writeStandard(image, format, path, options);
+            } else if (format == ImageFormat.WEBP) {
                 writeViaCliFromPng(image, path, options, resolveToolPath("cwebp"), null, "-o", path.toAbsolutePath().toString());
-            } else if ("avif".equals(ext)) {
+            } else if (format == ImageFormat.AVIF) {
                 writeViaCliFromPng(image, path, options, resolveToolPath("heif-enc"), null, "-o", path.toAbsolutePath().toString());
             } else {
-                throw new ImageEditorException("Unsupported image format: " + ext);
+                throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
         } catch (IOException e) {
             throw new ImageEditorException("Failed to write image: " + path, e);
@@ -93,18 +89,16 @@ public class ImageIOHandler {
 
     // --- Stream-based read/write ---
 
-    public static BufferedImage read(InputStream input, String formatHint) {
-        String ext = formatHint.toLowerCase();
-
+    public static BufferedImage read(InputStream input, ImageFormat format) {
         try {
-            if (STANDARD_FORMATS.contains(ext)) {
+            if (format.isStandard()) {
                 BufferedImage image = ImageIO.read(input);
                 if (image == null) {
-                    throw new ImageEditorException("Could not read image from stream with format hint: " + formatHint);
+                    throw new ImageEditorException("Could not read image from stream with format hint: " + format.getExtension());
                 }
                 return image;
-            } else if ("webp".equals(ext) || "avif".equals(ext)) {
-                Path tmpInput = Files.createTempFile("imageeditor-in-", "." + ext);
+            } else if (format == ImageFormat.WEBP || format == ImageFormat.AVIF) {
+                Path tmpInput = Files.createTempFile("imageeditor-in-", "." + format.getExtension());
                 try {
                     try (OutputStream out = Files.newOutputStream(tmpInput)) {
                         input.transferTo(out);
@@ -114,23 +108,21 @@ public class ImageIOHandler {
                     Files.deleteIfExists(tmpInput);
                 }
             } else {
-                throw new ImageEditorException("Unsupported image format: " + ext);
+                throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
         } catch (IOException e) {
             throw new ImageEditorException("Failed to read image from stream", e);
         }
     }
 
-    public static void write(BufferedImage image, OutputStream output, String format, OutputOptions options) {
-        String ext = format.toLowerCase();
-
+    public static void write(BufferedImage image, OutputStream output, ImageFormat format, OutputOptions options) {
         try {
-            if (STANDARD_FORMATS.contains(ext)) {
-                writeStandardToStream(image, ext, output, options);
-            } else if ("webp".equals(ext) || "avif".equals(ext)) {
-                Path tmpOutput = Files.createTempFile("imageeditor-out-", "." + ext);
+            if (format.isStandard()) {
+                writeStandardToStream(image, format, output, options);
+            } else if (format == ImageFormat.WEBP || format == ImageFormat.AVIF) {
+                Path tmpOutput = Files.createTempFile("imageeditor-out-", "." + format.getExtension());
                 try {
-                    write(image, tmpOutput, options);
+                    write(image, tmpOutput, format, options);
                     try (InputStream in = Files.newInputStream(tmpOutput)) {
                         in.transferTo(output);
                     }
@@ -138,7 +130,7 @@ public class ImageIOHandler {
                     Files.deleteIfExists(tmpOutput);
                 }
             } else {
-                throw new ImageEditorException("Unsupported image format: " + ext);
+                throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
         } catch (IOException e) {
             throw new ImageEditorException("Failed to write image to stream", e);
@@ -147,28 +139,28 @@ public class ImageIOHandler {
 
     // --- Format detection ---
 
-    public static String detectFormat(Path path) {
+    public static ImageFormat detectFormat(Path path) {
         try (InputStream is = Files.newInputStream(path)) {
-            String detected = detectFromMagicBytes(is);
+            ImageFormat detected = detectFromMagicBytes(is);
             if (detected != null) {
                 return detected;
             }
         } catch (IOException ignored) {
         }
         try {
-            return getExtension(path.getFileName().toString());
+            return getFormat(path.getFileName().toString());
         } catch (ImageEditorException e) {
             return null;
         }
     }
 
-    public static String detectFormat(InputStream input) {
+    public static ImageFormat detectFormat(InputStream input) {
         if (!input.markSupported()) {
             input = new BufferedInputStream(input);
         }
         try {
             input.mark(12);
-            String detected = detectFromMagicBytes(input);
+            ImageFormat detected = detectFromMagicBytes(input);
             input.reset();
             return detected;
         } catch (IOException e) {
@@ -176,7 +168,7 @@ public class ImageIOHandler {
         }
     }
 
-    private static String detectFromMagicBytes(InputStream is) throws IOException {
+    private static ImageFormat detectFromMagicBytes(InputStream is) throws IOException {
         byte[] header = new byte[12];
         int bytesRead = 0;
         while (bytesRead < 12) {
@@ -191,38 +183,38 @@ public class ImageIOHandler {
         // PNG: 89 50 4E 47
         if (bytesRead >= 4 && (header[0] & 0xFF) == 0x89 && header[1] == 0x50
                 && header[2] == 0x4E && header[3] == 0x47) {
-            return "png";
+            return ImageFormat.PNG;
         }
         // JPEG: FF D8 FF
         if ((header[0] & 0xFF) == 0xFF && (header[1] & 0xFF) == 0xD8 && (header[2] & 0xFF) == 0xFF) {
-            return "jpeg";
+            return ImageFormat.JPEG;
         }
         // GIF: 47 49 46 38
         if (bytesRead >= 4 && header[0] == 0x47 && header[1] == 0x49
                 && header[2] == 0x46 && header[3] == 0x38) {
-            return "gif";
+            return ImageFormat.GIF;
         }
         // BMP: 42 4D
         if (header[0] == 0x42 && header[1] == 0x4D) {
-            return "bmp";
+            return ImageFormat.BMP;
         }
         // TIFF: 49 49 2A 00 (little-endian) or 4D 4D 00 2A (big-endian)
         if (bytesRead >= 4) {
             if (header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2A && header[3] == 0x00) {
-                return "tiff";
+                return ImageFormat.TIFF;
             }
             if (header[0] == 0x4D && header[1] == 0x4D && header[2] == 0x00 && header[3] == 0x2A) {
-                return "tiff";
+                return ImageFormat.TIFF;
             }
         }
         // WebP: RIFF at 0 + WEBP at 8
         if (bytesRead >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
                 && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
-            return "webp";
+            return ImageFormat.WEBP;
         }
         // AVIF: ftyp at offset 4
         if (bytesRead >= 8 && header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70) {
-            return "avif";
+            return ImageFormat.AVIF;
         }
 
         return null;
@@ -230,12 +222,11 @@ public class ImageIOHandler {
 
     // --- Format support check ---
 
-    public static boolean isFormatSupported(String format) {
-        String ext = format.toLowerCase();
-        if (STANDARD_FORMATS.contains(ext)) {
+    public static boolean isFormatSupported(ImageFormat format) {
+        if (format.isStandard()) {
             return true;
         }
-        List<String> tools = CLI_TOOLS.get(ext);
+        List<String> tools = CLI_TOOLS.get(format);
         if (tools == null) {
             return false;
         }
@@ -268,18 +259,18 @@ public class ImageIOHandler {
         return image;
     }
 
-    private static void writeStandard(BufferedImage image, String format, Path path, OutputOptions options)
+    private static void writeStandard(BufferedImage image, ImageFormat format, Path path, OutputOptions options)
             throws IOException {
-        String writeFormat = "jpg".equals(format) ? "jpeg" : format;
+        String writeFormat = format.getExtension();
 
-        if (options.getQuality() != null && ("jpeg".equals(writeFormat) || "jpg".equals(format))) {
+        if (options.getQuality() != null && format == ImageFormat.JPEG) {
             writeWithQuality(image, writeFormat, path, options);
         } else if (options.isStripMetadata()) {
             writeWithWriter(image, writeFormat, path, null);
         } else {
             boolean written = ImageIO.write(image, writeFormat, path.toFile());
             if (!written) {
-                throw new ImageEditorException("No writer found for format: " + format);
+                throw new ImageEditorException("No writer found for format: " + writeFormat);
             }
         }
     }
@@ -327,13 +318,13 @@ public class ImageIOHandler {
         }
     }
 
-    private static void writeStandardToStream(BufferedImage image, String format, OutputStream output,
+    private static void writeStandardToStream(BufferedImage image, ImageFormat format, OutputStream output,
                                               OutputOptions options) throws IOException {
-        String writeFormat = "jpg".equals(format) ? "jpeg" : format;
+        String writeFormat = format.getExtension();
 
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(writeFormat);
         if (!writers.hasNext()) {
-            throw new ImageEditorException("No writer found for format: " + format);
+            throw new ImageEditorException("No writer found for format: " + writeFormat);
         }
         ImageWriter writer = writers.next();
         try {
@@ -423,6 +414,11 @@ public class ImageIOHandler {
         System.arraycopy(parts, 0, result, 0, parts.length);
         result[parts.length] = arg;
         return result;
+    }
+
+    public static ImageFormat getFormat(String fileName) {
+        String ext = getExtension(fileName);
+        return ImageFormat.fromExtension(ext);
     }
 
     public static String getExtension(String fileName) {

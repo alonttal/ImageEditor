@@ -118,31 +118,24 @@ class ImageIOHandlerTest {
 
     @Test
     void standardFormatsAlwaysSupported() {
-        assertTrue(ImageIOHandler.isFormatSupported("png"));
-        assertTrue(ImageIOHandler.isFormatSupported("jpg"));
-        assertTrue(ImageIOHandler.isFormatSupported("jpeg"));
-        assertTrue(ImageIOHandler.isFormatSupported("gif"));
-        assertTrue(ImageIOHandler.isFormatSupported("bmp"));
-        assertTrue(ImageIOHandler.isFormatSupported("PNG"));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.PNG));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.JPEG));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.GIF));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.BMP));
     }
 
     @Test
     void webpSupportedWhenToolsInstalled() {
         assumeTrue(isToolAvailable("cwebp"), "cwebp not installed, skipping");
         assumeTrue(isToolAvailable("dwebp"), "dwebp not installed, skipping");
-        assertTrue(ImageIOHandler.isFormatSupported("webp"));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.WEBP));
     }
 
     @Test
     void avifSupportedWhenToolsInstalled() {
         assumeTrue(isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
         assumeTrue(isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
-        assertTrue(ImageIOHandler.isFormatSupported("avif"));
-    }
-
-    @Test
-    void unknownFormatNotSupported() {
-        assertFalse(ImageIOHandler.isFormatSupported("xyz"));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.AVIF));
     }
 
     // --- Quality tests ---
@@ -185,7 +178,7 @@ class ImageIOHandlerTest {
     @Test
     void detectFormatPng() throws IOException {
         Path file = createTestImage(10, 10, "png");
-        assertEquals("png", ImageIOHandler.detectFormat(file));
+        assertEquals(ImageFormat.PNG, ImageIOHandler.detectFormat(file));
     }
 
     @Test
@@ -193,7 +186,7 @@ class ImageIOHandlerTest {
         Path file = createTestImage(10, 10, "jpeg");
         Path jpgFile = tempDir.resolve("detect.jpg");
         Files.move(file, jpgFile);
-        assertEquals("jpeg", ImageIOHandler.detectFormat(jpgFile));
+        assertEquals(ImageFormat.JPEG, ImageIOHandler.detectFormat(jpgFile));
     }
 
     @Test
@@ -201,7 +194,7 @@ class ImageIOHandlerTest {
         Path file = tempDir.resolve("detect.gif");
         BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
         ImageIO.write(img, "gif", file.toFile());
-        assertEquals("gif", ImageIOHandler.detectFormat(file));
+        assertEquals(ImageFormat.GIF, ImageIOHandler.detectFormat(file));
     }
 
     @Test
@@ -209,7 +202,7 @@ class ImageIOHandlerTest {
         Path file = tempDir.resolve("detect.bmp");
         BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
         ImageIO.write(img, "bmp", file.toFile());
-        assertEquals("bmp", ImageIOHandler.detectFormat(file));
+        assertEquals(ImageFormat.BMP, ImageIOHandler.detectFormat(file));
     }
 
     @Test
@@ -219,14 +212,14 @@ class ImageIOHandlerTest {
         Path webp = tempDir.resolve("detect.webp");
         new ProcessBuilder("cwebp", png.toAbsolutePath().toString(), "-o", webp.toAbsolutePath().toString())
                 .redirectErrorStream(true).start().waitFor();
-        assertEquals("webp", ImageIOHandler.detectFormat(webp));
+        assertEquals(ImageFormat.WEBP, ImageIOHandler.detectFormat(webp));
     }
 
     @Test
     void detectFormatFromInputStream() throws IOException {
         Path file = createTestImage(10, 10, "png");
         try (InputStream is = new BufferedInputStream(Files.newInputStream(file))) {
-            assertEquals("png", ImageIOHandler.detectFormat(is));
+            assertEquals(ImageFormat.PNG, ImageIOHandler.detectFormat(is));
             // Stream should still be readable after detection (mark/reset)
             BufferedImage img = ImageIO.read(is);
             assertNotNull(img);
@@ -238,7 +231,7 @@ class ImageIOHandlerTest {
         // Create a file with unknown content but valid extension
         Path file = tempDir.resolve("fallback.png");
         Files.write(file, new byte[]{0x00, 0x00, 0x00}); // garbage bytes
-        assertEquals("png", ImageIOHandler.detectFormat(file));
+        assertEquals(ImageFormat.PNG, ImageIOHandler.detectFormat(file));
     }
 
     // --- Stream-based I/O tests ---
@@ -249,13 +242,13 @@ class ImageIOHandlerTest {
 
         BufferedImage image;
         try (InputStream is = Files.newInputStream(file)) {
-            image = ImageIOHandler.read(is, "png");
+            image = ImageIOHandler.read(is, ImageFormat.PNG);
         }
         assertEquals(60, image.getWidth());
         assertEquals(40, image.getHeight());
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIOHandler.write(image, baos, "png", OutputOptions.defaults());
+        ImageIOHandler.write(image, baos, ImageFormat.PNG, OutputOptions.defaults());
 
         // Read back from byte array
         BufferedImage result = ImageIO.read(new ByteArrayInputStream(baos.toByteArray()));
@@ -273,8 +266,8 @@ class ImageIOHandlerTest {
         OutputOptions highOpts = OutputOptions.builder().quality(0.95f).build();
         OutputOptions lowOpts = OutputOptions.builder().quality(0.1f).build();
 
-        ImageIOHandler.write(image, highBaos, "jpeg", highOpts);
-        ImageIOHandler.write(image, lowBaos, "jpeg", lowOpts);
+        ImageIOHandler.write(image, highBaos, ImageFormat.JPEG, highOpts);
+        ImageIOHandler.write(image, lowBaos, ImageFormat.JPEG, lowOpts);
 
         assertTrue(highBaos.size() > lowBaos.size(),
                 "High quality (" + highBaos.size() + ") should be larger than low quality (" + lowBaos.size() + ")");
@@ -371,7 +364,7 @@ class ImageIOHandlerTest {
     @Test
     void detectFormatNonExistentFile() {
         Path noFile = tempDir.resolve("missing.png");
-        assertEquals("png", ImageIOHandler.detectFormat(noFile));
+        assertEquals(ImageFormat.PNG, ImageIOHandler.detectFormat(noFile));
     }
 
     @Test
@@ -386,7 +379,7 @@ class ImageIOHandlerTest {
         Path tiff = tempDir.resolve("test.tiff");
         // TIFF little-endian magic: 49 49 2A 00
         Files.write(tiff, new byte[]{0x49, 0x49, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-        assertEquals("tiff", ImageIOHandler.detectFormat(tiff));
+        assertEquals(ImageFormat.TIFF, ImageIOHandler.detectFormat(tiff));
     }
 
     @Test
@@ -404,7 +397,7 @@ class ImageIOHandlerTest {
         try {
             ImageIOHandler.setToolDirectory(fakeDir);
             InputStream is = new ByteArrayInputStream(new byte[]{0x01});
-            assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, "webp"));
+            assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, ImageFormat.WEBP));
         } finally {
             ImageIOHandler.setToolDirectory(null);
         }
@@ -419,7 +412,7 @@ class ImageIOHandlerTest {
             BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             assertThrows(ImageEditorException.class, () ->
-                    ImageIOHandler.write(img, baos, "webp", OutputOptions.defaults()));
+                    ImageIOHandler.write(img, baos, ImageFormat.WEBP, OutputOptions.defaults()));
         } finally {
             ImageIOHandler.setToolDirectory(null);
         }
@@ -434,8 +427,8 @@ class ImageIOHandlerTest {
         try {
             ImageIOHandler.setToolDirectory(fakeDir);
             // With a fake directory containing no executables, CLI formats should not be supported
-            assertFalse(ImageIOHandler.isFormatSupported("webp"));
-            assertFalse(ImageIOHandler.isFormatSupported("avif"));
+            assertFalse(ImageIOHandler.isFormatSupported(ImageFormat.WEBP));
+            assertFalse(ImageIOHandler.isFormatSupported(ImageFormat.AVIF));
         } finally {
             ImageIOHandler.setToolDirectory(null);
         }
@@ -447,7 +440,7 @@ class ImageIOHandlerTest {
         ImageIOHandler.setToolDirectory(null);
         assertNull(ImageIOHandler.getToolDirectory());
         // Standard formats should still work regardless
-        assertTrue(ImageIOHandler.isFormatSupported("png"));
+        assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.PNG));
     }
 
     @Test

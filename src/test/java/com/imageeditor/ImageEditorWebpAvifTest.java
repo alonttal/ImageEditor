@@ -1,5 +1,6 @@
 package com.imageeditor;
 
+import com.imageeditor.io.ImageFormat;
 import com.imageeditor.io.ImageIOHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -122,7 +123,7 @@ class ImageEditorWebpAvifTest {
 
         ImageEditor.builder()
                 .resize(60, 45)
-                .outputFormat("png")
+                .outputFormat(ImageFormat.PNG)
                 .build()
                 .process(webpInput, pngOutput);
 

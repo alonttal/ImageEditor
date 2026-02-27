@@ -33,8 +33,8 @@ class OutputOptionsTest {
 
     @Test
     void outputFormatRoundTrip() {
-        OutputOptions opts = OutputOptions.builder().outputFormat("webp").build();
-        assertEquals("webp", opts.getOutputFormat());
+        OutputOptions opts = OutputOptions.builder().outputFormat(ImageFormat.WEBP).build();
+        assertEquals(ImageFormat.WEBP, opts.getOutputFormat());
     }
 
     @Test

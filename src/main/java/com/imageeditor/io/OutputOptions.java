@@ -4,9 +4,9 @@ public class OutputOptions {
 
     private final Float quality;
     private final boolean stripMetadata;
-    private final String outputFormat;
+    private final ImageFormat outputFormat;
 
-    private OutputOptions(Float quality, boolean stripMetadata, String outputFormat) {
+    private OutputOptions(Float quality, boolean stripMetadata, ImageFormat outputFormat) {
         this.quality = quality;
         this.stripMetadata = stripMetadata;
         this.outputFormat = outputFormat;
@@ -24,7 +24,7 @@ public class OutputOptions {
         return stripMetadata;
     }
 
-    public String getOutputFormat() {
+    public ImageFormat getOutputFormat() {
         return outputFormat;
     }
 
@@ -35,7 +35,7 @@ public class OutputOptions {
     public static class Builder {
         private Float quality;
         private boolean stripMetadata;
-        private String outputFormat;
+        private ImageFormat outputFormat;
 
         public Builder quality(float quality) {
             if (Float.isNaN(quality) || quality < 0.0f || quality > 1.0f) {
@@ -50,8 +50,8 @@ public class OutputOptions {
             return this;
         }
 
-        public Builder outputFormat(String format) {
-            this.outputFormat = format != null ? format.toLowerCase() : null;
+        public Builder outputFormat(ImageFormat format) {
+            this.outputFormat = format;
             return this;
         }
 

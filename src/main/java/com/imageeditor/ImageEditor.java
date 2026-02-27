@@ -1,5 +1,6 @@
 package com.imageeditor;
 
+import com.imageeditor.io.ImageFormat;
 import com.imageeditor.io.ImageIOHandler;
 import com.imageeditor.io.OutputOptions;
 import com.imageeditor.exception.ImageEditorException;
@@ -42,19 +43,19 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        String format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.getOutputFormat();
         if (format == null) {
-            format = ImageIOHandler.getExtension(inputPath.getFileName().toString());
+            format = ImageIOHandler.getFormat(inputPath.getFileName().toString());
         }
         ImageIOHandler.write(image, outputPath, format, outputOptions);
     }
 
-    public void process(InputStream input, OutputStream output, String outputFormat) {
+    public void process(InputStream input, OutputStream output) {
         BufferedInputStream buffered = input instanceof BufferedInputStream
                 ? (BufferedInputStream) input
                 : new BufferedInputStream(input);
 
-        String detectedFormat = ImageIOHandler.detectFormat(buffered);
+        ImageFormat detectedFormat = ImageIOHandler.detectFormat(buffered);
         if (detectedFormat == null) {
             throw new ImageEditorException("Could not detect input image format from stream");
         }
@@ -65,9 +66,9 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        String format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.getOutputFormat();
         if (format == null) {
-            format = outputFormat;
+            format = detectedFormat;
         }
         ImageIOHandler.write(image, output, format, outputOptions);
     }
@@ -133,21 +134,21 @@ public class ImageEditor {
 
     private Path resolveOutputFile(Path inputFile, Path outputDir) {
         String name = inputFile.getFileName().toString();
-        String format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.getOutputFormat();
         if (format != null) {
             int dot = name.lastIndexOf('.');
             if (dot >= 0) {
                 name = name.substring(0, dot);
             }
-            name = name + "." + format;
+            name = name + "." + format.getExtension();
         }
         return outputDir.resolve(name);
     }
 
     private boolean isSupportedImage(Path path) {
         try {
-            String ext = ImageIOHandler.getExtension(path.getFileName().toString());
-            return ImageIOHandler.isFormatSupported(ext);
+            ImageFormat format = ImageIOHandler.getFormat(path.getFileName().toString());
+            return ImageIOHandler.isFormatSupported(format);
         } catch (ImageEditorException e) {
             return false;
         }
@@ -157,7 +158,7 @@ public class ImageEditor {
         private final List<Operation> operations = new ArrayList<>();
         private Float quality;
         private boolean stripMetadata;
-        private String outputFormat;
+        private ImageFormat outputFormat;
 
         public Builder resize(int width, int height) {
             operations.add(new ResizeOperation(width, height));
@@ -192,7 +193,7 @@ public class ImageEditor {
             return this;
         }
 
-        public Builder outputFormat(String format) {
+        public Builder outputFormat(ImageFormat format) {
             this.outputFormat = format;
             return this;
         }

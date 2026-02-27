@@ -1,5 +1,6 @@
 package com.imageeditor;
 
+import com.imageeditor.io.ImageFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -81,13 +82,13 @@ class ImageEditorTest {
 
         ImageEditor.builder()
                 .quality(0.95f)
-                .outputFormat("jpg")
+                .outputFormat(ImageFormat.JPEG)
                 .build()
                 .process(richInput, highOutput);
 
         ImageEditor.builder()
                 .quality(0.1f)
-                .outputFormat("jpg")
+                .outputFormat(ImageFormat.JPEG)
                 .build()
                 .process(richInput, lowOutput);
 
@@ -128,7 +129,7 @@ class ImageEditorTest {
             ImageEditor.builder()
                     .resize(50, 40)
                     .build()
-                    .process(is, baos, "png");
+                    .process(is, baos);
         }
 
         BufferedImage result = ImageIO.read(new ByteArrayInputStream(baos.toByteArray()));
@@ -146,8 +147,9 @@ class ImageEditorTest {
         try (InputStream is = Files.newInputStream(richInput)) {
             ImageEditor.builder()
                     .quality(0.5f)
+                    .outputFormat(ImageFormat.JPEG)
                     .build()
-                    .process(is, baos, "jpeg");
+                    .process(is, baos);
         }
 
         BufferedImage result = ImageIO.read(new ByteArrayInputStream(baos.toByteArray()));
@@ -242,7 +244,7 @@ class ImageEditorTest {
         Path output = tempDir.resolve("output.jpg");
 
         ImageEditor.builder()
-                .outputFormat("jpg")
+                .outputFormat(ImageFormat.JPEG)
                 .build()
                 .process(input, output);
 
@@ -258,7 +260,7 @@ class ImageEditorTest {
         Path output = tempDir.resolve("converted.png");
 
         ImageEditor.builder()
-                .outputFormat("png")
+                .outputFormat(ImageFormat.PNG)
                 .build()
                 .process(jpgInput, output);
 
@@ -381,7 +383,7 @@ class ImageEditorTest {
         Path output = tempDir.resolve("output.png"); // extension says png
 
         ImageEditor.builder()
-                .outputFormat("jpg")
+                .outputFormat(ImageFormat.JPEG)
                 .build()
                 .process(input, output);
 
@@ -402,18 +404,18 @@ class ImageEditorTest {
         createTestImageAt(inputDir.resolve("b.png"), 100, 80);
 
         ImageEditor.builder()
-                .outputFormat("jpg")
+                .outputFormat(ImageFormat.JPEG)
                 .build()
                 .processDirectory(inputDir, outputDir);
 
-        // All output files should have .jpg extension
+        // All output files should have .jpeg extension (canonical)
         try (var stream = Files.list(outputDir)) {
             List<String> names = stream.map(p -> p.getFileName().toString()).sorted().toList();
-            assertEquals(List.of("a.jpg", "b.jpg"), names);
+            assertEquals(List.of("a.jpeg", "b.jpeg"), names);
         }
 
         // Verify they are actual JPEGs
-        byte[] bytes = Files.readAllBytes(outputDir.resolve("a.jpg"));
+        byte[] bytes = Files.readAllBytes(outputDir.resolve("a.jpeg"));
         assertEquals((byte) 0xFF, bytes[0]);
         assertEquals((byte) 0xD8, bytes[1]);
     }
