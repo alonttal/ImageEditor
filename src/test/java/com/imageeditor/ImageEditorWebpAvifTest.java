@@ -81,6 +81,57 @@ class ImageEditorWebpAvifTest {
     }
 
     @Test
+    void coverAvif() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        Path avifInput = createAvifImage(300, 200);
+        Path avifOutput = tempDir.resolve("covered.avif");
+
+        ImageEditor.builder()
+                .cover(100, 100)
+                .build()
+                .process(avifInput, avifOutput);
+
+        BufferedImage result = ImageIOHandler.read(avifOutput);
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
+    void fitWebp() throws Exception {
+        assumeTrue(webpAvailable, "WebP tools not installed, skipping");
+
+        Path webpInput = createWebpImage(300, 200);
+        Path webpOutput = tempDir.resolve("fitted.webp");
+
+        ImageEditor.builder()
+                .fit(100, 100)
+                .build()
+                .process(webpInput, webpOutput);
+
+        BufferedImage result = ImageIOHandler.read(webpOutput);
+        assertEquals(100, result.getWidth());
+        assertEquals(67, result.getHeight());
+    }
+
+    @Test
+    void fitAvif() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        Path avifInput = createAvifImage(300, 200);
+        Path avifOutput = tempDir.resolve("fitted.avif");
+
+        ImageEditor.builder()
+                .fit(100, 100)
+                .build()
+                .process(avifInput, avifOutput);
+
+        BufferedImage result = ImageIOHandler.read(avifOutput);
+        assertEquals(100, result.getWidth());
+        assertEquals(67, result.getHeight());
+    }
+
+    @Test
     void resizeAvif() throws Exception {
         assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
 
