@@ -87,7 +87,22 @@ class CoverOperationTest {
     }
 
     @Test
-    void rejectsZeroDimensions() {
+    void rejectsZeroWidth() {
         assertThrows(ImageEditorException.class, () -> new CoverOperation(0, 100));
+    }
+
+    @Test
+    void rejectsZeroHeight() {
+        assertThrows(ImageEditorException.class, () -> new CoverOperation(100, 0));
+    }
+
+    @Test
+    void rejectsNegativeWidth() {
+        assertThrows(ImageEditorException.class, () -> new CoverOperation(-1, 100));
+    }
+
+    @Test
+    void rejectsNegativeHeight() {
+        assertThrows(ImageEditorException.class, () -> new CoverOperation(100, -1));
     }
 }

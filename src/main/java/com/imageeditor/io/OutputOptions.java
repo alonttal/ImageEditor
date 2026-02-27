@@ -3,7 +3,7 @@ package com.imageeditor.io;
 /**
  * Options that control how a processed image is written.
  *
- * @param quality       JPEG/WebP compression quality between 0.0 and 1.0,
+ * @param quality       JPEG/WebP/AVIF compression quality between 0.0 and 1.0,
  *                      or {@code null} to use the encoder default
  * @param stripMetadata {@code true} to omit image metadata from the output
  * @param outputFormat  explicit output format, or {@code null} to infer

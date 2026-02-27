@@ -1,5 +1,6 @@
 package com.imageeditor;
 
+import com.imageeditor.io.CliToolRunner;
 import com.imageeditor.io.ImageFormat;
 import com.imageeditor.io.ImageIOHandler;
 import org.junit.jupiter.api.BeforeAll;
@@ -25,8 +26,8 @@ class ImageEditorWebpAvifTest {
 
     @BeforeAll
     static void checkTools() {
-        webpAvailable = isToolAvailable("cwebp") && isToolAvailable("dwebp");
-        avifAvailable = isToolAvailable("heif-enc") && isToolAvailable("heif-dec");
+        webpAvailable = CliToolRunner.isToolAvailable("cwebp") && CliToolRunner.isToolAvailable("dwebp");
+        avifAvailable = CliToolRunner.isToolAvailable("heif-enc") && CliToolRunner.isToolAvailable("heif-dec");
     }
 
     @Test
@@ -275,13 +276,4 @@ class ImageEditorWebpAvifTest {
         return avif;
     }
 
-    private static boolean isToolAvailable(String tool) {
-        try {
-            Process p = new ProcessBuilder("which", tool)
-                    .redirectErrorStream(true).start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

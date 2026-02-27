@@ -134,7 +134,7 @@ ImageEditor.builder()
 ### Quality, Metadata, and Format Conversion
 
 ```java
-// Set JPEG/WebP compression quality (0.0–1.0) and strip metadata
+// Set JPEG/WebP/AVIF compression quality (0.0–1.0); other formats ignore this setting
 ImageEditor.builder()
     .resize(1200, 800)
     .quality(0.85f)
@@ -142,7 +142,7 @@ ImageEditor.builder()
     .build()
     .process(Path.of("photo.jpg"), Path.of("optimized.jpg"));
 
-// Force output format regardless of file extension
+// Force output format (by default the input format is preserved)
 ImageEditor.builder()
     .outputFormat(ImageFormat.WEBP)
     .build()

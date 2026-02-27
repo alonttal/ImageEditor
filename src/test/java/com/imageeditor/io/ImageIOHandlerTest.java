@@ -54,8 +54,8 @@ class ImageIOHandlerTest {
 
     @Test
     void readAndWriteWebp() throws IOException, InterruptedException {
-        assumeTrue(isToolAvailable("cwebp"), "cwebp not installed, skipping");
-        assumeTrue(isToolAvailable("dwebp"), "dwebp not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("cwebp"), "cwebp not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("dwebp"), "dwebp not installed, skipping");
 
         // Create a PNG, then convert to WebP via cwebp
         Path png = createTestImage(64, 48, "png");
@@ -80,8 +80,8 @@ class ImageIOHandlerTest {
 
     @Test
     void readAndWriteAvif() throws IOException, InterruptedException {
-        assumeTrue(isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
-        assumeTrue(isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
 
         // Create a PNG, then convert to AVIF via heif-enc
         Path png = createTestImage(64, 48, "png");
@@ -126,15 +126,15 @@ class ImageIOHandlerTest {
 
     @Test
     void webpSupportedWhenToolsInstalled() {
-        assumeTrue(isToolAvailable("cwebp"), "cwebp not installed, skipping");
-        assumeTrue(isToolAvailable("dwebp"), "dwebp not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("cwebp"), "cwebp not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("dwebp"), "dwebp not installed, skipping");
         assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.WEBP));
     }
 
     @Test
     void avifSupportedWhenToolsInstalled() {
-        assumeTrue(isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
-        assumeTrue(isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
         assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.AVIF));
     }
 
@@ -207,7 +207,7 @@ class ImageIOHandlerTest {
 
     @Test
     void detectFormatWebp() throws IOException, InterruptedException {
-        assumeTrue(isToolAvailable("cwebp"), "cwebp not installed, skipping");
+        assumeTrue(CliToolRunner.isToolAvailable("cwebp"), "cwebp not installed, skipping");
         Path png = createTestImage(10, 10, "png");
         Path webp = tempDir.resolve("detect.webp");
         new ProcessBuilder("cwebp", png.toAbsolutePath().toString(), "-o", webp.toAbsolutePath().toString())
@@ -492,6 +492,14 @@ class ImageIOHandlerTest {
     }
 
     @Test
+    void detectFormatStreamIsobmffNonAvifIsNotDetectedAsAvif() {
+        // ISOBMFF with brand "isom" — should NOT be detected as AVIF
+        byte[] isom = new byte[]{0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D};
+        InputStream is = new BufferedInputStream(new ByteArrayInputStream(isom));
+        assertNull(ImageIOHandler.detectFormat(is));
+    }
+
+    @Test
     void detectFormatStreamAvifMagicBytes() {
         // AVIF: ftyp at offset 4 (bytes: 00 00 00 xx 66 74 79 70)
         byte[] avif = new byte[]{0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66};
@@ -662,13 +670,4 @@ class ImageIOHandlerTest {
         return img;
     }
 
-    private boolean isToolAvailable(String tool) {
-        try {
-            Process p = new ProcessBuilder("which", tool)
-                    .redirectErrorStream(true).start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

@@ -47,6 +47,15 @@ public class CliToolRunner {
         return toolDirectory;
     }
 
+    /**
+     * Resolves the full path to a CLI tool. If a custom tool directory has
+     * been configured via {@link #setToolDirectory(Path)}, the tool name is
+     * resolved relative to that directory; otherwise the bare tool name is
+     * returned, relying on the system {@code PATH}.
+     *
+     * @param toolName the tool executable name (e.g. {@code "cwebp"})
+     * @return the resolved path string
+     */
     static String resolveToolPath(String toolName) {
         Path dir = toolDirectory;
         if (dir != null) {
@@ -70,7 +79,17 @@ public class CliToolRunner {
         return tools.stream().allMatch(CliToolRunner::isToolAvailable);
     }
 
-    static boolean isToolAvailable(String tool) {
+    /**
+     * Checks whether a single CLI tool is available on the current system.
+     *
+     * <p>If a custom tool directory is set, checks for an executable file in
+     * that directory. Otherwise uses {@code which} (or {@code where} on
+     * Windows) to locate the tool on the system {@code PATH}.
+     *
+     * @param tool the tool executable name (e.g. {@code "cwebp"})
+     * @return {@code true} if the tool is found and executable
+     */
+    public static boolean isToolAvailable(String tool) {
         try {
             Path dir = toolDirectory;
             if (dir != null) {
@@ -86,6 +105,14 @@ public class CliToolRunner {
         }
     }
 
+    /**
+     * Runs an external process with the given command and waits for it to
+     * complete. Throws an {@link ImageEditorException} if the process times
+     * out, exits with a non-zero status, or cannot be started.
+     *
+     * @param command the command array (tool path followed by arguments)
+     * @throws ImageEditorException if execution fails
+     */
     static void runProcess(String[] command) {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -115,6 +142,14 @@ public class CliToolRunner {
         }
     }
 
+    /**
+     * Returns a new array containing all elements of {@code parts} followed
+     * by {@code arg}.
+     *
+     * @param parts the original command parts
+     * @param arg   the argument to append
+     * @return a new array with {@code arg} appended
+     */
     static String[] appendArg(String[] parts, String arg) {
         String[] result = new String[parts.length + 1];
         System.arraycopy(parts, 0, result, 0, parts.length);

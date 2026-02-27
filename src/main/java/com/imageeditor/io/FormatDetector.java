@@ -109,9 +109,12 @@ public class FormatDetector {
                 && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
             return ImageFormat.WEBP;
         }
-        // AVIF: ftyp at offset 4
-        if (bytesRead >= 8 && header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70) {
-            return ImageFormat.AVIF;
+        // AVIF: ftyp at offset 4, major brand at offset 8 must be avif, avis, or mif1
+        if (bytesRead >= 12 && header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70) {
+            String brand = new String(header, 8, 4, java.nio.charset.StandardCharsets.US_ASCII);
+            if (brand.equals("avif") || brand.equals("avis") || brand.equals("mif1")) {
+                return ImageFormat.AVIF;
+            }
         }
 
         return null;

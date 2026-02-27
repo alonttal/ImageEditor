@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 /**
@@ -333,7 +334,7 @@ public class ImageIOHandler {
         try {
             ImageIO.write(image, "png", tmpPng.toFile());
             // Build command, replacing null placeholder with tmp png path
-            java.util.ArrayList<String> command = new java.util.ArrayList<>();
+            ArrayList<String> command = new ArrayList<>();
             for (String part : commandParts) {
                 command.add(part == null ? tmpPng.toAbsolutePath().toString() : part);
             }

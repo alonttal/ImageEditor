@@ -182,7 +182,11 @@ public class ImageEditor {
                 }
             }
             if (!errors.isEmpty()) {
-                throw errors.get(0);
+                ImageEditorException first = errors.get(0);
+                for (int i = 1; i < errors.size(); i++) {
+                    first.addSuppressed(errors.get(i));
+                }
+                throw first;
             }
         }
     }
@@ -288,7 +292,8 @@ public class ImageEditor {
         }
 
         /**
-         * Sets the compression quality for formats that support it (e.g. JPEG, WebP).
+         * Sets the compression quality for formats that support it
+         * (JPEG, WebP, AVIF). Other formats silently ignore this setting.
          *
          * @param q quality value between 0.0 (lowest) and 1.0 (highest)
          * @return this builder
