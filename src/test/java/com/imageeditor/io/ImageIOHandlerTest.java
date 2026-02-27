@@ -398,19 +398,31 @@ class ImageIOHandlerTest {
     // --- Stream I/O edge cases ---
 
     @Test
-    void streamReadWebpWithoutTools() {
-        assumeTrue(!isToolAvailable("dwebp"), "dwebp is installed, skipping");
-        InputStream is = new ByteArrayInputStream(new byte[]{0x01});
-        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, "webp"));
+    void streamReadWebpWithoutTools() throws IOException {
+        Path fakeDir = tempDir.resolve("no-tools-read");
+        Files.createDirectory(fakeDir);
+        ImageIOHandler.setToolDirectory(fakeDir);
+        try {
+            InputStream is = new ByteArrayInputStream(new byte[]{0x01});
+            assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, "webp"));
+        } finally {
+            ImageIOHandler.setToolDirectory(null);
+        }
     }
 
     @Test
-    void streamWriteWebpWithoutTools() {
-        assumeTrue(!isToolAvailable("cwebp"), "cwebp is installed, skipping");
-        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        assertThrows(ImageEditorException.class, () ->
-                ImageIOHandler.write(img, baos, "webp", OutputOptions.defaults()));
+    void streamWriteWebpWithoutTools() throws IOException {
+        Path fakeDir = tempDir.resolve("no-tools-write");
+        Files.createDirectory(fakeDir);
+        ImageIOHandler.setToolDirectory(fakeDir);
+        try {
+            BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            assertThrows(ImageEditorException.class, () ->
+                    ImageIOHandler.write(img, baos, "webp", OutputOptions.defaults()));
+        } finally {
+            ImageIOHandler.setToolDirectory(null);
+        }
     }
 
     // --- Tool directory configuration tests ---
