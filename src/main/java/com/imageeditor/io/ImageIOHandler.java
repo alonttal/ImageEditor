@@ -7,6 +7,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
@@ -247,6 +248,9 @@ public class ImageIOHandler {
 
     private static void writeStandard(BufferedImage image, ImageFormat format, Path path, OutputOptions options)
             throws IOException {
+        if (!supportsAlpha(format)) {
+            image = removeAlpha(image);
+        }
         String writeFormat = format.getExtension();
 
         if (options.quality() != null && format == ImageFormat.JPEG) {
@@ -263,6 +267,9 @@ public class ImageIOHandler {
 
     private static void writeStandardToStream(BufferedImage image, ImageFormat format, OutputStream output,
                                               OutputOptions options) throws IOException {
+        if (!supportsAlpha(format)) {
+            image = removeAlpha(image);
+        }
         writeViaImageWriter(image, format.getExtension(), output, options);
     }
 
@@ -290,6 +297,23 @@ public class ImageIOHandler {
         } finally {
             writer.dispose();
         }
+    }
+
+    private static boolean supportsAlpha(ImageFormat format) {
+        return format == ImageFormat.PNG || format == ImageFormat.TIFF;
+    }
+
+    private static BufferedImage removeAlpha(BufferedImage image) {
+        if (!image.getColorModel().hasAlpha()) {
+            return image;
+        }
+        BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = rgb.createGraphics();
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+        g.drawImage(image, 0, 0, null);
+        g.dispose();
+        return rgb;
     }
 
     private static BufferedImage readViaCliToPng(Path inputPath, String... commandParts) throws IOException {

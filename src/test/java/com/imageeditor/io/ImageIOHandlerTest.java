@@ -588,6 +588,57 @@ class ImageIOHandlerTest {
         assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(emptyStream, ImageFormat.PNG));
     }
 
+    // --- Alpha channel stripping tests ---
+
+    @Test
+    void writeArgbImageToJpegStripsAlpha() throws IOException {
+        BufferedImage argb = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = argb.createGraphics();
+        g.setColor(new Color(255, 0, 0, 128));
+        g.fillRect(0, 0, 50, 50);
+        g.dispose();
+
+        Path output = tempDir.resolve("alpha.jpg");
+        ImageIOHandler.write(argb, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertNotNull(result);
+        assertEquals(50, result.getWidth());
+        assertFalse(result.getColorModel().hasAlpha());
+    }
+
+    @Test
+    void writeArgbImageToPngPreservesAlpha() throws IOException {
+        BufferedImage argb = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = argb.createGraphics();
+        g.setColor(new Color(255, 0, 0, 128));
+        g.fillRect(0, 0, 50, 50);
+        g.dispose();
+
+        Path output = tempDir.resolve("alpha.png");
+        ImageIOHandler.write(argb, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertNotNull(result);
+        assertTrue(result.getColorModel().hasAlpha());
+    }
+
+    @Test
+    void writeArgbImageToJpegStreamStripsAlpha() throws IOException {
+        BufferedImage argb = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = argb.createGraphics();
+        g.setColor(new Color(255, 0, 0, 128));
+        g.fillRect(0, 0, 50, 50);
+        g.dispose();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIOHandler.write(argb, baos, ImageFormat.JPEG, OutputOptions.defaults());
+
+        BufferedImage result = ImageIO.read(new ByteArrayInputStream(baos.toByteArray()));
+        assertNotNull(result);
+        assertFalse(result.getColorModel().hasAlpha());
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

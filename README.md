@@ -1,6 +1,6 @@
 # ImageEditor
 
-A lightweight Java library for image manipulation. Supports **resize**, **fit**, **cover**, and **crop** operations with a fluent builder API, plus quality control, metadata stripping, format conversion, stream I/O, and batch processing.
+A lightweight Java library for image manipulation. Supports **resize**, **fit**, **cover**, **crop**, and **scaleDown** operations with a fluent builder API, plus quality control, metadata stripping, format conversion, stream I/O, and batch processing.
 
 ## Supported Formats
 
@@ -48,7 +48,7 @@ brew install libheif
 
 1. **WebP** — Download the prebuilt `libwebp` binaries from https://developers.google.com/speed/webp/download. Extract the archive and add the `bin` folder (containing `cwebp.exe` and `dwebp.exe`) to your `PATH`.
 
-2. **AVIF** — Download `libheif` from https://github.com/nicktheriot/libheif-windows/releases or build from source. Add the folder containing `heif-enc.exe` and `heif-dec.exe` to your `PATH`.
+2. **AVIF** — Download `libheif` from https://github.com/strukturag/libheif/releases or build from source. Add the folder containing `heif-enc.exe` and `heif-dec.exe` to your `PATH`.
 
 After installation, verify the tools are accessible from your terminal:
 
@@ -116,6 +116,12 @@ ImageEditor.builder()
     .crop(10, 10, 200, 200)
     .build()
     .process(Path.of("photo.avif"), Path.of("cropped.avif"));
+
+// Scale down to fit within bounds (no-op if already smaller)
+ImageEditor.builder()
+    .scaleDown(800, 600)
+    .build()
+    .process(Path.of("photo.png"), Path.of("scaled.png"));
 
 // Chain multiple operations
 ImageEditor.builder()
