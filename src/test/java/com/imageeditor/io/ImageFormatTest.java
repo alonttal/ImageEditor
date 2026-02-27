@@ -54,6 +54,30 @@ class ImageFormatTest {
     }
 
     @Test
+    void fromExtensionCaseInsensitiveRemainingFormats() {
+        assertEquals(ImageFormat.GIF, ImageFormat.fromExtension("GIF"));
+        assertEquals(ImageFormat.GIF, ImageFormat.fromExtension("Gif"));
+        assertEquals(ImageFormat.BMP, ImageFormat.fromExtension("BMP"));
+        assertEquals(ImageFormat.BMP, ImageFormat.fromExtension("Bmp"));
+        assertEquals(ImageFormat.TIFF, ImageFormat.fromExtension("TIFF"));
+        assertEquals(ImageFormat.TIFF, ImageFormat.fromExtension("Tiff"));
+        assertEquals(ImageFormat.AVIF, ImageFormat.fromExtension("AVIF"));
+        assertEquals(ImageFormat.AVIF, ImageFormat.fromExtension("Avif"));
+    }
+
+    @Test
+    void valuesCountIsExactlySeven() {
+        assertEquals(7, ImageFormat.values().length);
+    }
+
+    @Test
+    void fromExtensionWhitespacePaddedThrows() {
+        assertThrows(ImageEditorException.class, () -> ImageFormat.fromExtension(" png "));
+        assertThrows(ImageEditorException.class, () -> ImageFormat.fromExtension(" jpeg"));
+        assertThrows(ImageEditorException.class, () -> ImageFormat.fromExtension("gif "));
+    }
+
+    @Test
     void isStandard() {
         assertTrue(ImageFormat.PNG.isStandard());
         assertTrue(ImageFormat.JPEG.isStandard());

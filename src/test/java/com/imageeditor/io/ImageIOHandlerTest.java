@@ -454,6 +454,140 @@ class ImageIOHandlerTest {
         }
     }
 
+    // --- getFormat() direct tests ---
+
+    @Test
+    void getFormatPng() {
+        assertEquals(ImageFormat.PNG, ImageIOHandler.getFormat("photo.png"));
+    }
+
+    @Test
+    void getFormatJpgUpperCase() {
+        assertEquals(ImageFormat.JPEG, ImageIOHandler.getFormat("IMG.JPG"));
+    }
+
+    @Test
+    void getFormatTiffMultipleDots() {
+        assertEquals(ImageFormat.TIFF, ImageIOHandler.getFormat("a.b.tiff"));
+    }
+
+    @Test
+    void getFormatNoExtensionThrows() {
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.getFormat("noext"));
+    }
+
+    @Test
+    void getFormatUnsupportedExtensionThrows() {
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.getFormat("file.xyz"));
+    }
+
+    // --- Additional detectFormat(InputStream) tests ---
+
+    @Test
+    void detectFormatStreamTiffBigEndian() {
+        // TIFF big-endian magic: 4D 4D 00 2A
+        byte[] tiffBE = new byte[]{0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        InputStream is = new BufferedInputStream(new ByteArrayInputStream(tiffBE));
+        assertEquals(ImageFormat.TIFF, ImageIOHandler.detectFormat(is));
+    }
+
+    @Test
+    void detectFormatStreamAvifMagicBytes() {
+        // AVIF: ftyp at offset 4 (bytes: 00 00 00 xx 66 74 79 70)
+        byte[] avif = new byte[]{0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66};
+        InputStream is = new BufferedInputStream(new ByteArrayInputStream(avif));
+        assertEquals(ImageFormat.AVIF, ImageIOHandler.detectFormat(is));
+    }
+
+    @Test
+    void detectFormatStreamJpeg() throws IOException {
+        Path file = createTestImage(10, 10, "jpeg");
+        Path jpgFile = tempDir.resolve("detect_stream.jpg");
+        Files.move(file, jpgFile);
+        try (InputStream is = new BufferedInputStream(Files.newInputStream(jpgFile))) {
+            assertEquals(ImageFormat.JPEG, ImageIOHandler.detectFormat(is));
+            // Stream should still be readable after detection
+            BufferedImage img = ImageIO.read(is);
+            assertNotNull(img);
+        }
+    }
+
+    @Test
+    void detectFormatStreamGif() throws IOException {
+        Path file = tempDir.resolve("detect_stream.gif");
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "gif", file.toFile());
+        try (InputStream is = new BufferedInputStream(Files.newInputStream(file))) {
+            assertEquals(ImageFormat.GIF, ImageIOHandler.detectFormat(is));
+            BufferedImage result = ImageIO.read(is);
+            assertNotNull(result);
+        }
+    }
+
+    // --- Stream round-trip for GIF and BMP ---
+
+    @Test
+    void streamReadWriteRoundTripGif() throws IOException {
+        Path file = tempDir.resolve("roundtrip.gif");
+        BufferedImage img = new BufferedImage(30, 20, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "gif", file.toFile());
+
+        BufferedImage image;
+        try (InputStream is = Files.newInputStream(file)) {
+            image = ImageIOHandler.read(is, ImageFormat.GIF);
+        }
+        assertEquals(30, image.getWidth());
+        assertEquals(20, image.getHeight());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIOHandler.write(image, baos, ImageFormat.GIF, OutputOptions.defaults());
+
+        byte[] bytes = baos.toByteArray();
+        // GIF magic: 47 49 46 38
+        assertEquals((byte) 0x47, bytes[0]);
+        assertEquals((byte) 0x49, bytes[1]);
+        assertEquals((byte) 0x46, bytes[2]);
+        assertEquals((byte) 0x38, bytes[3]);
+
+        BufferedImage result = ImageIO.read(new ByteArrayInputStream(bytes));
+        assertEquals(30, result.getWidth());
+        assertEquals(20, result.getHeight());
+    }
+
+    @Test
+    void streamReadWriteRoundTripBmp() throws IOException {
+        Path file = tempDir.resolve("roundtrip.bmp");
+        BufferedImage img = new BufferedImage(30, 20, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "bmp", file.toFile());
+
+        BufferedImage image;
+        try (InputStream is = Files.newInputStream(file)) {
+            image = ImageIOHandler.read(is, ImageFormat.BMP);
+        }
+        assertEquals(30, image.getWidth());
+        assertEquals(20, image.getHeight());
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIOHandler.write(image, baos, ImageFormat.BMP, OutputOptions.defaults());
+
+        byte[] bytes = baos.toByteArray();
+        // BMP magic: 42 4D
+        assertEquals((byte) 0x42, bytes[0]);
+        assertEquals((byte) 0x4D, bytes[1]);
+
+        BufferedImage result = ImageIO.read(new ByteArrayInputStream(bytes));
+        assertEquals(30, result.getWidth());
+        assertEquals(20, result.getHeight());
+    }
+
+    // --- Stream read with empty/null image ---
+
+    @Test
+    void streamReadEmptyStreamThrows() {
+        InputStream emptyStream = new ByteArrayInputStream(new byte[0]);
+        assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(emptyStream, ImageFormat.PNG));
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

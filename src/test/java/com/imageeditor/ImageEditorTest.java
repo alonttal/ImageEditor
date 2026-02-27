@@ -437,6 +437,111 @@ class ImageEditorTest {
         assertEquals((byte) 0x47, bytes[3]);
     }
 
+    // --- Stream format conversion tests ---
+
+    @Test
+    void processStreamWithFormatConversion() throws IOException {
+        Path input = createTestImage(60, 40, "png");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (InputStream is = Files.newInputStream(input)) {
+            ImageEditor.builder()
+                    .outputFormat(ImageFormat.JPEG)
+                    .build()
+                    .process(is, baos);
+        }
+
+        byte[] bytes = baos.toByteArray();
+        // Verify JPEG magic bytes (FF D8 FF)
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+        assertEquals((byte) 0xFF, bytes[2]);
+    }
+
+    @Test
+    void processStreamPreservesDetectedFormat() throws IOException {
+        Path input = createTestImage(60, 40, "png");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (InputStream is = Files.newInputStream(input)) {
+            ImageEditor.builder()
+                    .build()
+                    .process(is, baos);
+        }
+
+        byte[] bytes = baos.toByteArray();
+        // Verify PNG magic bytes (89 50 4E 47)
+        assertEquals((byte) 0x89, bytes[0]);
+        assertEquals((byte) 0x50, bytes[1]);
+        assertEquals((byte) 0x4E, bytes[2]);
+        assertEquals((byte) 0x47, bytes[3]);
+    }
+
+    @Test
+    void processStreamWithUndetectableFormatThrows() {
+        byte[] garbage = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+        ByteArrayInputStream bais = new ByteArrayInputStream(garbage);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().process(bais, baos));
+    }
+
+    @Test
+    void processDirectoryWithPngOutputFormat() throws IOException {
+        Path inputDir = tempDir.resolve("png_fmt_input");
+        Path outputDir = tempDir.resolve("png_fmt_output");
+        Files.createDirectories(inputDir);
+
+        // Create JPEG inputs
+        BufferedImage img = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpeg", inputDir.resolve("x.jpg").toFile());
+        ImageIO.write(img, "jpeg", inputDir.resolve("y.jpg").toFile());
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.PNG)
+                .build()
+                .processDirectory(inputDir, outputDir);
+
+        // Verify .png extensions
+        try (var stream = Files.list(outputDir)) {
+            List<String> names = stream.map(p -> p.getFileName().toString()).sorted().toList();
+            assertEquals(List.of("x.png", "y.png"), names);
+        }
+
+        // Verify PNG magic bytes
+        byte[] bytes = Files.readAllBytes(outputDir.resolve("x.png"));
+        assertEquals((byte) 0x89, bytes[0]);
+        assertEquals((byte) 0x50, bytes[1]);
+        assertEquals((byte) 0x4E, bytes[2]);
+        assertEquals((byte) 0x47, bytes[3]);
+    }
+
+    @Test
+    void builderFullCombo() throws IOException {
+        Path input = createTestImage(100, 100, "png");
+        Path output = tempDir.resolve("combo.jpg");
+
+        ImageEditor.builder()
+                .resize(50, 50)
+                .quality(0.8f)
+                .stripMetadata()
+                .outputFormat(ImageFormat.JPEG)
+                .build()
+                .process(input, output);
+
+        // Verify JPEG magic bytes
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+        assertEquals((byte) 0xFF, bytes[2]);
+
+        // Verify dimensions
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+        assertEquals(50, result.getHeight());
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

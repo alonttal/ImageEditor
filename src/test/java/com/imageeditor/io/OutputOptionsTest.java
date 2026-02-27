@@ -47,6 +47,39 @@ class OutputOptionsTest {
     }
 
     @Test
+    void stripMetadataTrueRoundTrip() {
+        OutputOptions opts = OutputOptions.builder().stripMetadata(true).build();
+        assertTrue(opts.isStripMetadata());
+    }
+
+    @Test
+    void outputFormatNullExplicit() {
+        OutputOptions opts = OutputOptions.builder().outputFormat(null).build();
+        assertNull(opts.getOutputFormat());
+    }
+
+    @Test
+    void allSevenFormatsRoundTrip() {
+        for (ImageFormat format : ImageFormat.values()) {
+            OutputOptions opts = OutputOptions.builder().outputFormat(format).build();
+            assertEquals(format, opts.getOutputFormat());
+        }
+    }
+
+    @Test
+    void fullCombination() {
+        OutputOptions opts = OutputOptions.builder()
+                .quality(0.8f)
+                .stripMetadata(true)
+                .outputFormat(ImageFormat.JPEG)
+                .build();
+
+        assertEquals(0.8f, opts.getQuality());
+        assertTrue(opts.isStripMetadata());
+        assertEquals(ImageFormat.JPEG, opts.getOutputFormat());
+    }
+
+    @Test
     void builderIsReusable() {
         OutputOptions.Builder builder = OutputOptions.builder().quality(0.5f).stripMetadata(true);
         OutputOptions a = builder.build();
