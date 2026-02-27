@@ -9,6 +9,7 @@ import com.imageeditor.operation.CropOperation;
 import com.imageeditor.operation.FitOperation;
 import com.imageeditor.operation.Operation;
 import com.imageeditor.operation.ResizeOperation;
+import com.imageeditor.operation.ScaleDownOperation;
 
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -269,6 +270,20 @@ public class ImageEditor {
          */
         public Builder fit(int maxWidth, int maxHeight) {
             operations.add(new FitOperation(maxWidth, maxHeight));
+            return this;
+        }
+
+        /**
+         * Appends a scale-down operation to the pipeline. Shrinks the image to
+         * fit within the given bounds while preserving aspect ratio, but never
+         * enlarges an image that already fits.
+         *
+         * @param maxWidth  maximum width in pixels
+         * @param maxHeight maximum height in pixels
+         * @return this builder
+         */
+        public Builder scaleDown(int maxWidth, int maxHeight) {
+            operations.add(new ScaleDownOperation(maxWidth, maxHeight));
             return this;
         }
 
