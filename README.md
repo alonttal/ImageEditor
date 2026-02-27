@@ -142,6 +142,10 @@ ImageEditor.builder()
     .build()
     .process(Path.of("photo.jpg"), Path.of("optimized.jpg"));
 
+// stripMetadata() removes EXIF, IPTC, and XMP data from the output — recommended
+// for web serving (smaller files) and user-uploaded images (strips GPS location,
+// camera info, and other potentially sensitive data)
+
 // Force output format (by default the input format is preserved)
 ImageEditor.builder()
     .outputFormat(ImageFormat.WEBP)
