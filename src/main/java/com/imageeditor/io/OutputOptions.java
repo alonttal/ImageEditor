@@ -1,31 +1,9 @@
 package com.imageeditor.io;
 
-public class OutputOptions {
-
-    private final Float quality;
-    private final boolean stripMetadata;
-    private final ImageFormat outputFormat;
-
-    private OutputOptions(Float quality, boolean stripMetadata, ImageFormat outputFormat) {
-        this.quality = quality;
-        this.stripMetadata = stripMetadata;
-        this.outputFormat = outputFormat;
-    }
+public record OutputOptions(Float quality, boolean stripMetadata, ImageFormat outputFormat) {
 
     public static OutputOptions defaults() {
         return new OutputOptions(null, false, null);
-    }
-
-    public Float getQuality() {
-        return quality;
-    }
-
-    public boolean isStripMetadata() {
-        return stripMetadata;
-    }
-
-    public ImageFormat getOutputFormat() {
-        return outputFormat;
     }
 
     public static Builder builder() {

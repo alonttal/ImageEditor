@@ -1,22 +1,11 @@
 package com.imageeditor.operation;
 
-import com.imageeditor.exception.ImageEditorException;
-
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
-public class FitOperation implements Operation {
+public record FitOperation(int maxWidth, int maxHeight) implements Operation {
 
-    private final int maxWidth;
-    private final int maxHeight;
-
-    public FitOperation(int maxWidth, int maxHeight) {
-        if (maxWidth <= 0 || maxHeight <= 0) {
-            throw new ImageEditorException("Fit dimensions must be positive: " + maxWidth + "x" + maxHeight);
-        }
-        this.maxWidth = maxWidth;
-        this.maxHeight = maxHeight;
+    public FitOperation {
+        ImageScaler.requirePositiveDimensions(maxWidth, maxHeight, "Fit");
     }
 
     @Override
@@ -28,11 +17,6 @@ public class FitOperation implements Operation {
         int scaledWidth = (int) Math.round(image.getWidth() * scale);
         int scaledHeight = (int) Math.round(image.getHeight() * scale);
 
-        BufferedImage result = new BufferedImage(scaledWidth, scaledHeight, image.getType());
-        Graphics2D g = result.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(image, 0, 0, scaledWidth, scaledHeight, null);
-        g.dispose();
-        return result;
+        return ImageScaler.scale(image, scaledWidth, scaledHeight);
     }
 }

@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class ImageEditor {
 
@@ -43,7 +42,7 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        ImageFormat format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.outputFormat();
         if (format == null) {
             format = ImageIOHandler.getFormat(inputPath.getFileName().toString());
         }
@@ -66,7 +65,7 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        ImageFormat format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.outputFormat();
         if (format == null) {
             format = detectedFormat;
         }
@@ -103,23 +102,17 @@ public class ImageEditor {
                 processOne(f, outputDir);
             }
         } else {
-            ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             List<ImageEditorException> errors = Collections.synchronizedList(new ArrayList<>());
-            for (Path f : imageFiles) {
-                pool.submit(() -> {
-                    try {
-                        processOne(f, outputDir);
-                    } catch (ImageEditorException e) {
-                        errors.add(e);
-                    }
-                });
-            }
-            pool.shutdown();
-            try {
-                pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new ImageEditorException("Batch processing interrupted", e);
+            try (ExecutorService pool = Executors.newFixedThreadPool(parallelism)) {
+                for (Path f : imageFiles) {
+                    pool.submit(() -> {
+                        try {
+                            processOne(f, outputDir);
+                        } catch (ImageEditorException e) {
+                            errors.add(e);
+                        }
+                    });
+                }
             }
             if (!errors.isEmpty()) {
                 throw errors.get(0);
@@ -134,7 +127,7 @@ public class ImageEditor {
 
     private Path resolveOutputFile(Path inputFile, Path outputDir) {
         String name = inputFile.getFileName().toString();
-        ImageFormat format = outputOptions.getOutputFormat();
+        ImageFormat format = outputOptions.outputFormat();
         if (format != null) {
             int dot = name.lastIndexOf('.');
             if (dot >= 0) {

@@ -9,20 +9,20 @@ class OutputOptionsTest {
     @Test
     void defaultsHaveNoQualityAndNoStrip() {
         OutputOptions opts = OutputOptions.defaults();
-        assertNull(opts.getQuality());
-        assertFalse(opts.isStripMetadata());
+        assertNull(opts.quality());
+        assertFalse(opts.stripMetadata());
     }
 
     @Test
     void qualityBoundary0() {
         OutputOptions opts = OutputOptions.builder().quality(0.0f).build();
-        assertEquals(0.0f, opts.getQuality());
+        assertEquals(0.0f, opts.quality());
     }
 
     @Test
     void qualityBoundary1() {
         OutputOptions opts = OutputOptions.builder().quality(1.0f).build();
-        assertEquals(1.0f, opts.getQuality());
+        assertEquals(1.0f, opts.quality());
     }
 
     @Test
@@ -34,35 +34,35 @@ class OutputOptionsTest {
     @Test
     void outputFormatRoundTrip() {
         OutputOptions opts = OutputOptions.builder().outputFormat(ImageFormat.WEBP).build();
-        assertEquals(ImageFormat.WEBP, opts.getOutputFormat());
+        assertEquals(ImageFormat.WEBP, opts.outputFormat());
     }
 
     @Test
     void defaultOutputFormatIsNull() {
         OutputOptions opts = OutputOptions.defaults();
-        assertNull(opts.getOutputFormat());
+        assertNull(opts.outputFormat());
 
         OutputOptions built = OutputOptions.builder().build();
-        assertNull(built.getOutputFormat());
+        assertNull(built.outputFormat());
     }
 
     @Test
     void stripMetadataTrueRoundTrip() {
         OutputOptions opts = OutputOptions.builder().stripMetadata(true).build();
-        assertTrue(opts.isStripMetadata());
+        assertTrue(opts.stripMetadata());
     }
 
     @Test
     void outputFormatNullExplicit() {
         OutputOptions opts = OutputOptions.builder().outputFormat(null).build();
-        assertNull(opts.getOutputFormat());
+        assertNull(opts.outputFormat());
     }
 
     @Test
     void allSevenFormatsRoundTrip() {
         for (ImageFormat format : ImageFormat.values()) {
             OutputOptions opts = OutputOptions.builder().outputFormat(format).build();
-            assertEquals(format, opts.getOutputFormat());
+            assertEquals(format, opts.outputFormat());
         }
     }
 
@@ -74,9 +74,9 @@ class OutputOptionsTest {
                 .outputFormat(ImageFormat.JPEG)
                 .build();
 
-        assertEquals(0.8f, opts.getQuality());
-        assertTrue(opts.isStripMetadata());
-        assertEquals(ImageFormat.JPEG, opts.getOutputFormat());
+        assertEquals(0.8f, opts.quality());
+        assertTrue(opts.stripMetadata());
+        assertEquals(ImageFormat.JPEG, opts.outputFormat());
     }
 
     @Test
@@ -86,7 +86,7 @@ class OutputOptionsTest {
         OutputOptions b = builder.build();
 
         assertNotSame(a, b);
-        assertEquals(a.getQuality(), b.getQuality());
-        assertEquals(a.isStripMetadata(), b.isStripMetadata());
+        assertEquals(a.quality(), b.quality());
+        assertEquals(a.stripMetadata(), b.stripMetadata());
     }
 }

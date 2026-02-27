@@ -1,22 +1,11 @@
 package com.imageeditor.operation;
 
-import com.imageeditor.exception.ImageEditorException;
-
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
-public class CoverOperation implements Operation {
+public record CoverOperation(int targetWidth, int targetHeight) implements Operation {
 
-    private final int targetWidth;
-    private final int targetHeight;
-
-    public CoverOperation(int targetWidth, int targetHeight) {
-        if (targetWidth <= 0 || targetHeight <= 0) {
-            throw new ImageEditorException("Cover dimensions must be positive: " + targetWidth + "x" + targetHeight);
-        }
-        this.targetWidth = targetWidth;
-        this.targetHeight = targetHeight;
+    public CoverOperation {
+        ImageScaler.requirePositiveDimensions(targetWidth, targetHeight, "Cover");
     }
 
     @Override
@@ -28,15 +17,11 @@ public class CoverOperation implements Operation {
         int scaledWidth = (int) Math.round(image.getWidth() * scale);
         int scaledHeight = (int) Math.round(image.getHeight() * scale);
 
-        BufferedImage scaled = new BufferedImage(scaledWidth, scaledHeight, image.getType());
-        Graphics2D g = scaled.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(image, 0, 0, scaledWidth, scaledHeight, null);
-        g.dispose();
+        BufferedImage scaled = ImageScaler.scale(image, scaledWidth, scaledHeight);
 
         int cropX = (scaledWidth - targetWidth) / 2;
         int cropY = (scaledHeight - targetHeight) / 2;
 
-        return scaled.getSubimage(cropX, cropY, targetWidth, targetHeight);
+        return ImageScaler.copyRegion(scaled, cropX, cropY, targetWidth, targetHeight);
     }
 }
