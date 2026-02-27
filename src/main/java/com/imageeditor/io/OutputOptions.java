@@ -4,14 +4,16 @@ public class OutputOptions {
 
     private final Float quality;
     private final boolean stripMetadata;
+    private final String outputFormat;
 
-    private OutputOptions(Float quality, boolean stripMetadata) {
+    private OutputOptions(Float quality, boolean stripMetadata, String outputFormat) {
         this.quality = quality;
         this.stripMetadata = stripMetadata;
+        this.outputFormat = outputFormat;
     }
 
     public static OutputOptions defaults() {
-        return new OutputOptions(null, false);
+        return new OutputOptions(null, false, null);
     }
 
     public Float getQuality() {
@@ -22,6 +24,10 @@ public class OutputOptions {
         return stripMetadata;
     }
 
+    public String getOutputFormat() {
+        return outputFormat;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -29,9 +35,10 @@ public class OutputOptions {
     public static class Builder {
         private Float quality;
         private boolean stripMetadata;
+        private String outputFormat;
 
         public Builder quality(float quality) {
-            if (quality < 0.0f || quality > 1.0f) {
+            if (Float.isNaN(quality) || quality < 0.0f || quality > 1.0f) {
                 throw new IllegalArgumentException("Quality must be between 0.0 and 1.0, got: " + quality);
             }
             this.quality = quality;
@@ -43,8 +50,13 @@ public class OutputOptions {
             return this;
         }
 
+        public Builder outputFormat(String format) {
+            this.outputFormat = format != null ? format.toLowerCase() : null;
+            return this;
+        }
+
         public OutputOptions build() {
-            return new OutputOptions(quality, stripMetadata);
+            return new OutputOptions(quality, stripMetadata, outputFormat);
         }
     }
 }

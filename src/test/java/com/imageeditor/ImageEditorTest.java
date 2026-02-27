@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,11 +81,13 @@ class ImageEditorTest {
 
         ImageEditor.builder()
                 .quality(0.95f)
+                .outputFormat("jpg")
                 .build()
                 .process(richInput, highOutput);
 
         ImageEditor.builder()
                 .quality(0.1f)
+                .outputFormat("jpg")
                 .build()
                 .process(richInput, lowOutput);
 
@@ -217,6 +220,219 @@ class ImageEditorTest {
                 }
             });
         }
+    }
+
+    // --- process() edge cases ---
+
+    @Test
+    void processNoOperations() throws IOException {
+        Path input = createTestImage(80, 60, "png");
+        Path output = tempDir.resolve("copy.png");
+
+        ImageEditor.builder().build().process(input, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(80, result.getWidth());
+        assertEquals(60, result.getHeight());
+    }
+
+    @Test
+    void processConvertsPngToJpg() throws IOException {
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("output.jpg");
+
+        ImageEditor.builder()
+                .outputFormat("jpg")
+                .build()
+                .process(input, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+    }
+
+    @Test
+    void processConvertsJpgToPng() throws IOException {
+        BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        Path jpgInput = tempDir.resolve("convert.jpg");
+        ImageIO.write(img, "jpeg", jpgInput.toFile());
+        Path output = tempDir.resolve("converted.png");
+
+        ImageEditor.builder()
+                .outputFormat("png")
+                .build()
+                .process(jpgInput, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+    }
+
+    @Test
+    void processNonExistentInput() {
+        Path noFile = tempDir.resolve("missing.png");
+        Path output = tempDir.resolve("output.png");
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().process(noFile, output));
+    }
+
+    // --- processDirectory() edge cases ---
+
+    @Test
+    void processDirectoryNotADirectory() throws IOException {
+        Path file = createTestImage(10, 10, "png");
+        Path outputDir = tempDir.resolve("out");
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().processDirectory(file, outputDir));
+    }
+
+    @Test
+    void processDirectoryEmpty() throws IOException {
+        Path emptyDir = tempDir.resolve("empty");
+        Path outputDir = tempDir.resolve("empty_output");
+        Files.createDirectories(emptyDir);
+
+        ImageEditor.builder().resize(50, 50).build().processDirectory(emptyDir, outputDir);
+
+        assertTrue(Files.isDirectory(outputDir));
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(0, stream.count());
+        }
+    }
+
+    @Test
+    void processDirectorySkipsSubdirectories() throws IOException {
+        Path inputDir = tempDir.resolve("with_subdir");
+        Files.createDirectories(inputDir);
+        Files.createDirectories(inputDir.resolve("subdir"));
+        createTestImageAt(inputDir.resolve("image.png"), 100, 100);
+
+        Path outputDir = tempDir.resolve("output_skip");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(1, stream.count());
+        }
+    }
+
+    @Test
+    void processDirectoryWithMixedFormats() throws IOException {
+        Path inputDir = tempDir.resolve("mixed");
+        Files.createDirectories(inputDir);
+
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", inputDir.resolve("a.png").toFile());
+        ImageIO.write(img, "jpeg", inputDir.resolve("b.jpg").toFile());
+        ImageIO.write(img, "gif", inputDir.resolve("c.gif").toFile());
+
+        Path outputDir = tempDir.resolve("mixed_out");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(3, stream.count());
+        }
+    }
+
+    @Test
+    void processDirectoryZeroParallelism() throws IOException {
+        Path inputDir = tempDir.resolve("zero_par");
+        Files.createDirectories(inputDir);
+        createTestImageAt(inputDir.resolve("a.png"), 100, 100);
+
+        Path outputDir = tempDir.resolve("zero_par_out");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir, 0);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(1, stream.count());
+        }
+    }
+
+    @Test
+    void processDirectoryNegativeParallelism() throws IOException {
+        Path inputDir = tempDir.resolve("neg_par");
+        Files.createDirectories(inputDir);
+        createTestImageAt(inputDir.resolve("a.png"), 100, 100);
+
+        Path outputDir = tempDir.resolve("neg_par_out");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir, -1);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(1, stream.count());
+        }
+    }
+
+    // --- Builder edge cases ---
+
+    @Test
+    void builderQualityNaN() {
+        assertThrows(IllegalArgumentException.class, () -> ImageEditor.builder().quality(Float.NaN));
+    }
+
+    @Test
+    void builderQualityInfinity() {
+        assertThrows(IllegalArgumentException.class, () -> ImageEditor.builder().quality(Float.POSITIVE_INFINITY));
+    }
+
+    // --- Output format tests ---
+
+    @Test
+    void processWithOutputFormat() throws IOException {
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("output.png"); // extension says png
+
+        ImageEditor.builder()
+                .outputFormat("jpg")
+                .build()
+                .process(input, output);
+
+        // Verify the file is actually JPEG by checking magic bytes (FF D8 FF)
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+        assertEquals((byte) 0xFF, bytes[2]);
+    }
+
+    @Test
+    void processDirectoryWithOutputFormat() throws IOException {
+        Path inputDir = tempDir.resolve("fmt_input");
+        Path outputDir = tempDir.resolve("fmt_output");
+        Files.createDirectories(inputDir);
+
+        createTestImageAt(inputDir.resolve("a.png"), 80, 60);
+        createTestImageAt(inputDir.resolve("b.png"), 100, 80);
+
+        ImageEditor.builder()
+                .outputFormat("jpg")
+                .build()
+                .processDirectory(inputDir, outputDir);
+
+        // All output files should have .jpg extension
+        try (var stream = Files.list(outputDir)) {
+            List<String> names = stream.map(p -> p.getFileName().toString()).sorted().toList();
+            assertEquals(List.of("a.jpg", "b.jpg"), names);
+        }
+
+        // Verify they are actual JPEGs
+        byte[] bytes = Files.readAllBytes(outputDir.resolve("a.jpg"));
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+    }
+
+    @Test
+    void outputFormatNullPreservesExtension() throws IOException {
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("stays.png");
+
+        ImageEditor.builder()
+                .build()
+                .process(input, output);
+
+        // Verify the file is actually PNG by checking magic bytes (89 50 4E 47)
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0x89, bytes[0]);
+        assertEquals((byte) 0x50, bytes[1]);
+        assertEquals((byte) 0x4E, bytes[2]);
+        assertEquals((byte) 0x47, bytes[3]);
     }
 
     // --- Helpers ---

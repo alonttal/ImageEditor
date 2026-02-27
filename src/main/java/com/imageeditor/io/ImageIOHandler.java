@@ -70,6 +70,11 @@ public class ImageIOHandler {
 
     public static void write(BufferedImage image, Path path, OutputOptions options) {
         String ext = getExtension(path.getFileName().toString());
+        write(image, path, ext, options);
+    }
+
+    public static void write(BufferedImage image, Path path, String format, OutputOptions options) {
+        String ext = format.toLowerCase();
 
         try {
             if (STANDARD_FORMATS.contains(ext)) {

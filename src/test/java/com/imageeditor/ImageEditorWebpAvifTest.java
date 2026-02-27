@@ -122,12 +122,45 @@ class ImageEditorWebpAvifTest {
 
         ImageEditor.builder()
                 .resize(60, 45)
+                .outputFormat("png")
                 .build()
                 .process(webpInput, pngOutput);
 
         BufferedImage result = ImageIO.read(pngOutput.toFile());
         assertEquals(60, result.getWidth());
         assertEquals(45, result.getHeight());
+    }
+
+    @Test
+    void webpQualityControl() throws Exception {
+        assumeTrue(webpAvailable, "WebP tools not installed, skipping");
+
+        Path webpInput = createWebpImage(100, 100);
+        Path webpOutput = tempDir.resolve("quality.webp");
+
+        ImageEditor.builder()
+                .quality(0.5f)
+                .build()
+                .process(webpInput, webpOutput);
+
+        assertTrue(Files.exists(webpOutput));
+        assertTrue(Files.size(webpOutput) > 0);
+    }
+
+    @Test
+    void avifQualityControl() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        Path avifInput = createAvifImage(100, 100);
+        Path avifOutput = tempDir.resolve("quality.avif");
+
+        ImageEditor.builder()
+                .quality(0.5f)
+                .build()
+                .process(avifInput, avifOutput);
+
+        assertTrue(Files.exists(avifOutput));
+        assertTrue(Files.size(avifOutput) > 0);
     }
 
     private Path createWebpImage(int width, int height) throws IOException, InterruptedException {

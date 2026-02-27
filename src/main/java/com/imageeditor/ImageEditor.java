@@ -42,7 +42,11 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        ImageIOHandler.write(image, outputPath, outputOptions);
+        String format = outputOptions.getOutputFormat();
+        if (format == null) {
+            format = ImageIOHandler.getExtension(inputPath.getFileName().toString());
+        }
+        ImageIOHandler.write(image, outputPath, format, outputOptions);
     }
 
     public void process(InputStream input, OutputStream output, String outputFormat) {
@@ -61,7 +65,11 @@ public class ImageEditor {
             image = op.apply(image);
         }
 
-        ImageIOHandler.write(image, output, outputFormat, outputOptions);
+        String format = outputOptions.getOutputFormat();
+        if (format == null) {
+            format = outputFormat;
+        }
+        ImageIOHandler.write(image, output, format, outputOptions);
     }
 
     public void processDirectory(Path inputDir, Path outputDir) {
@@ -119,8 +127,21 @@ public class ImageEditor {
     }
 
     private void processOne(Path inputFile, Path outputDir) {
-        Path outputFile = outputDir.resolve(inputFile.getFileName());
+        Path outputFile = resolveOutputFile(inputFile, outputDir);
         process(inputFile, outputFile);
+    }
+
+    private Path resolveOutputFile(Path inputFile, Path outputDir) {
+        String name = inputFile.getFileName().toString();
+        String format = outputOptions.getOutputFormat();
+        if (format != null) {
+            int dot = name.lastIndexOf('.');
+            if (dot >= 0) {
+                name = name.substring(0, dot);
+            }
+            name = name + "." + format;
+        }
+        return outputDir.resolve(name);
     }
 
     private boolean isSupportedImage(Path path) {
@@ -136,6 +157,7 @@ public class ImageEditor {
         private final List<Operation> operations = new ArrayList<>();
         private Float quality;
         private boolean stripMetadata;
+        private String outputFormat;
 
         public Builder resize(int width, int height) {
             operations.add(new ResizeOperation(width, height));
@@ -158,7 +180,7 @@ public class ImageEditor {
         }
 
         public Builder quality(float q) {
-            if (q < 0.0f || q > 1.0f) {
+            if (Float.isNaN(q) || q < 0.0f || q > 1.0f) {
                 throw new IllegalArgumentException("Quality must be between 0.0 and 1.0, got: " + q);
             }
             this.quality = q;
@@ -170,12 +192,18 @@ public class ImageEditor {
             return this;
         }
 
+        public Builder outputFormat(String format) {
+            this.outputFormat = format;
+            return this;
+        }
+
         public ImageEditor build() {
             OutputOptions.Builder optBuilder = OutputOptions.builder();
             if (quality != null) {
                 optBuilder.quality(quality);
             }
             optBuilder.stripMetadata(stripMetadata);
+            optBuilder.outputFormat(outputFormat);
             OutputOptions opts = optBuilder.build();
             return new ImageEditor(new ArrayList<>(operations), opts);
         }
