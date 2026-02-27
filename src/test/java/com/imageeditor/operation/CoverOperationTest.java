@@ -54,6 +54,39 @@ class CoverOperationTest {
     }
 
     @Test
+    void coverExactMatch() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        CoverOperation op = new CoverOperation(100, 100);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
+    void cover1x1Target() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        CoverOperation op = new CoverOperation(1, 1);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(1, result.getWidth());
+        assertEquals(1, result.getHeight());
+    }
+
+    @Test
+    void coverExtremeAspectRatio() {
+        BufferedImage input = new BufferedImage(1000, 1, BufferedImage.TYPE_INT_RGB);
+        CoverOperation op = new CoverOperation(100, 100);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
     void rejectsZeroDimensions() {
         assertThrows(ImageEditorException.class, () -> new CoverOperation(0, 100));
     }

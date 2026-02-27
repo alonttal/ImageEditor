@@ -42,6 +42,38 @@ class ResizeOperationTest {
     }
 
     @Test
+    void resizeTo1x1() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ResizeOperation op = new ResizeOperation(1, 1);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(1, result.getWidth());
+        assertEquals(1, result.getHeight());
+    }
+
+    @Test
+    void resizePreservesRGBType() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ResizeOperation op = new ResizeOperation(50, 50);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(BufferedImage.TYPE_INT_RGB, result.getType());
+    }
+
+    @Test
+    void resizeExtremeAspectRatio() {
+        BufferedImage input = new BufferedImage(1, 1000, BufferedImage.TYPE_INT_RGB);
+        ResizeOperation op = new ResizeOperation(100, 100);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
     void rejectsZeroWidth() {
         assertThrows(ImageEditorException.class, () -> new ResizeOperation(0, 50));
     }

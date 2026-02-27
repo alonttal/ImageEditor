@@ -401,8 +401,8 @@ class ImageIOHandlerTest {
     void streamReadWebpWithoutTools() throws IOException {
         Path fakeDir = tempDir.resolve("no-tools-read");
         Files.createDirectory(fakeDir);
-        ImageIOHandler.setToolDirectory(fakeDir);
         try {
+            ImageIOHandler.setToolDirectory(fakeDir);
             InputStream is = new ByteArrayInputStream(new byte[]{0x01});
             assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(is, "webp"));
         } finally {
@@ -414,8 +414,8 @@ class ImageIOHandlerTest {
     void streamWriteWebpWithoutTools() throws IOException {
         Path fakeDir = tempDir.resolve("no-tools-write");
         Files.createDirectory(fakeDir);
-        ImageIOHandler.setToolDirectory(fakeDir);
         try {
+            ImageIOHandler.setToolDirectory(fakeDir);
             BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             assertThrows(ImageEditorException.class, () ->

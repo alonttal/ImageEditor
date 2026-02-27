@@ -32,6 +32,44 @@ class CropOperationTest {
     }
 
     @Test
+    void cropExactBounds() {
+        BufferedImage input = new BufferedImage(100, 80, BufferedImage.TYPE_INT_RGB);
+        CropOperation op = new CropOperation(0, 0, 100, 80);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(100, result.getWidth());
+        assertEquals(80, result.getHeight());
+    }
+
+    @Test
+    void cropAtEdge() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        CropOperation op = new CropOperation(50, 50, 50, 50);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(50, result.getWidth());
+        assertEquals(50, result.getHeight());
+    }
+
+    @Test
+    void cropSinglePixel() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        CropOperation op = new CropOperation(50, 50, 1, 1);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(1, result.getWidth());
+        assertEquals(1, result.getHeight());
+    }
+
+    @Test
+    void cropRejectsZeroHeight() {
+        assertThrows(ImageEditorException.class, () -> new CropOperation(0, 0, 50, 0));
+    }
+
+    @Test
     void rejectsOutOfBoundsCrop() {
         BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
         CropOperation op = new CropOperation(50, 50, 60, 60);

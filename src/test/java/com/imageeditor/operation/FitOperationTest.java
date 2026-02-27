@@ -65,6 +65,39 @@ class FitOperationTest {
     }
 
     @Test
+    void fitExactMatch() {
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        FitOperation op = new FitOperation(100, 100);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
+    void fitImageAlreadySmaller() {
+        BufferedImage input = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        FitOperation op = new FitOperation(50, 50);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(50, result.getWidth());
+        assertEquals(50, result.getHeight());
+    }
+
+    @Test
+    void fitExtremeAspectRatio() {
+        BufferedImage input = new BufferedImage(10, 1000, BufferedImage.TYPE_INT_RGB);
+        FitOperation op = new FitOperation(100, 100);
+
+        BufferedImage result = op.apply(input);
+
+        assertEquals(1, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
     void rejectsZeroDimensions() {
         assertThrows(ImageEditorException.class, () -> new FitOperation(0, 100));
     }
