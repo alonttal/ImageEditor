@@ -9,6 +9,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,33 +22,33 @@ class ImageIOHandlerTest {
 
     @Test
     void readAndWritePng() throws IOException {
-        File file = createTestImage(80, 60, "png");
+        Path file = createTestImage(80, 60, "png");
 
         BufferedImage image = ImageIOHandler.read(file);
         assertEquals(80, image.getWidth());
         assertEquals(60, image.getHeight());
 
-        File output = tempDir.resolve("out.png").toFile();
+        Path output = tempDir.resolve("out.png");
         ImageIOHandler.write(image, output);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(80, result.getWidth());
         assertEquals(60, result.getHeight());
     }
 
     @Test
     void readAndWriteJpg() throws IOException {
-        File file = createTestImage(80, 60, "jpeg");
-        File jpgFile = tempDir.resolve("input.jpg").toFile();
-        file.renameTo(jpgFile);
+        Path file = createTestImage(80, 60, "jpeg");
+        Path jpgFile = tempDir.resolve("input.jpg");
+        Files.move(file, jpgFile);
 
         BufferedImage image = ImageIOHandler.read(jpgFile);
         assertEquals(80, image.getWidth());
 
-        File output = tempDir.resolve("out.jpg").toFile();
+        Path output = tempDir.resolve("out.jpg");
         ImageIOHandler.write(image, output);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(80, result.getWidth());
     }
 
@@ -57,19 +58,19 @@ class ImageIOHandlerTest {
         assumeTrue(isToolAvailable("dwebp"), "dwebp not installed, skipping");
 
         // Create a PNG, then convert to WebP via cwebp
-        File png = createTestImage(64, 48, "png");
-        File webp = tempDir.resolve("test.webp").toFile();
-        new ProcessBuilder("cwebp", png.getAbsolutePath(), "-o", webp.getAbsolutePath())
+        Path png = createTestImage(64, 48, "png");
+        Path webp = tempDir.resolve("test.webp");
+        new ProcessBuilder("cwebp", png.toAbsolutePath().toString(), "-o", webp.toAbsolutePath().toString())
                 .redirectErrorStream(true).start().waitFor();
 
         BufferedImage image = ImageIOHandler.read(webp);
         assertEquals(64, image.getWidth());
         assertEquals(48, image.getHeight());
 
-        File outputWebp = tempDir.resolve("out.webp").toFile();
+        Path outputWebp = tempDir.resolve("out.webp");
         ImageIOHandler.write(image, outputWebp);
-        assertTrue(outputWebp.exists());
-        assertTrue(outputWebp.length() > 0);
+        assertTrue(Files.exists(outputWebp));
+        assertTrue(Files.size(outputWebp) > 0);
 
         // Verify round-trip by reading back
         BufferedImage roundTrip = ImageIOHandler.read(outputWebp);
@@ -83,19 +84,19 @@ class ImageIOHandlerTest {
         assumeTrue(isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
 
         // Create a PNG, then convert to AVIF via heif-enc
-        File png = createTestImage(64, 48, "png");
-        File avif = tempDir.resolve("test.avif").toFile();
-        new ProcessBuilder("heif-enc", png.getAbsolutePath(), "-o", avif.getAbsolutePath())
+        Path png = createTestImage(64, 48, "png");
+        Path avif = tempDir.resolve("test.avif");
+        new ProcessBuilder("heif-enc", png.toAbsolutePath().toString(), "-o", avif.toAbsolutePath().toString())
                 .redirectErrorStream(true).start().waitFor();
 
         BufferedImage image = ImageIOHandler.read(avif);
         assertEquals(64, image.getWidth());
         assertEquals(48, image.getHeight());
 
-        File outputAvif = tempDir.resolve("out.avif").toFile();
+        Path outputAvif = tempDir.resolve("out.avif");
         ImageIOHandler.write(image, outputAvif);
-        assertTrue(outputAvif.exists());
-        assertTrue(outputAvif.length() > 0);
+        assertTrue(Files.exists(outputAvif));
+        assertTrue(Files.size(outputAvif) > 0);
 
         // Verify round-trip by reading back
         BufferedImage roundTrip = ImageIOHandler.read(outputAvif);
@@ -105,13 +106,13 @@ class ImageIOHandlerTest {
 
     @Test
     void unsupportedFormatThrows() {
-        File file = tempDir.resolve("image.xyz").toFile();
+        Path file = tempDir.resolve("image.xyz");
         assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(file));
     }
 
     @Test
     void noExtensionThrows() {
-        File file = tempDir.resolve("noext").toFile();
+        Path file = tempDir.resolve("noext");
         assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(file));
     }
 
@@ -150,8 +151,8 @@ class ImageIOHandlerTest {
     void writeJpegWithDifferentQualityProducesDifferentSizes() throws IOException {
         BufferedImage image = createRichTestImage(200, 200);
 
-        File highQuality = tempDir.resolve("high.jpg").toFile();
-        File lowQuality = tempDir.resolve("low.jpg").toFile();
+        Path highQuality = tempDir.resolve("high.jpg");
+        Path lowQuality = tempDir.resolve("low.jpg");
 
         OutputOptions highOpts = OutputOptions.builder().quality(0.95f).build();
         OutputOptions lowOpts = OutputOptions.builder().quality(0.1f).build();
@@ -159,9 +160,9 @@ class ImageIOHandlerTest {
         ImageIOHandler.write(image, highQuality, highOpts);
         ImageIOHandler.write(image, lowQuality, lowOpts);
 
-        assertTrue(highQuality.length() > lowQuality.length(),
-                "High quality file (" + highQuality.length() + ") should be larger than low quality ("
-                        + lowQuality.length() + ")");
+        assertTrue(Files.size(highQuality) > Files.size(lowQuality),
+                "High quality file (" + Files.size(highQuality) + ") should be larger than low quality ("
+                        + Files.size(lowQuality) + ")");
     }
 
     // --- Metadata stripping tests ---
@@ -169,12 +170,12 @@ class ImageIOHandlerTest {
     @Test
     void writeWithStripMetadata() throws IOException {
         BufferedImage image = createRichTestImage(100, 100);
-        File output = tempDir.resolve("stripped.png").toFile();
+        Path output = tempDir.resolve("stripped.png");
 
         OutputOptions opts = OutputOptions.builder().stripMetadata(true).build();
         ImageIOHandler.write(image, output, opts);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(100, result.getWidth());
         assertEquals(100, result.getHeight());
     }
@@ -183,48 +184,48 @@ class ImageIOHandlerTest {
 
     @Test
     void detectFormatPng() throws IOException {
-        File file = createTestImage(10, 10, "png");
+        Path file = createTestImage(10, 10, "png");
         assertEquals("png", ImageIOHandler.detectFormat(file));
     }
 
     @Test
     void detectFormatJpeg() throws IOException {
-        File file = createTestImage(10, 10, "jpeg");
-        File jpgFile = tempDir.resolve("detect.jpg").toFile();
-        file.renameTo(jpgFile);
+        Path file = createTestImage(10, 10, "jpeg");
+        Path jpgFile = tempDir.resolve("detect.jpg");
+        Files.move(file, jpgFile);
         assertEquals("jpeg", ImageIOHandler.detectFormat(jpgFile));
     }
 
     @Test
     void detectFormatGif() throws IOException {
-        File file = tempDir.resolve("detect.gif").toFile();
+        Path file = tempDir.resolve("detect.gif");
         BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        ImageIO.write(img, "gif", file);
+        ImageIO.write(img, "gif", file.toFile());
         assertEquals("gif", ImageIOHandler.detectFormat(file));
     }
 
     @Test
     void detectFormatBmp() throws IOException {
-        File file = tempDir.resolve("detect.bmp").toFile();
+        Path file = tempDir.resolve("detect.bmp");
         BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        ImageIO.write(img, "bmp", file);
+        ImageIO.write(img, "bmp", file.toFile());
         assertEquals("bmp", ImageIOHandler.detectFormat(file));
     }
 
     @Test
     void detectFormatWebp() throws IOException, InterruptedException {
         assumeTrue(isToolAvailable("cwebp"), "cwebp not installed, skipping");
-        File png = createTestImage(10, 10, "png");
-        File webp = tempDir.resolve("detect.webp").toFile();
-        new ProcessBuilder("cwebp", png.getAbsolutePath(), "-o", webp.getAbsolutePath())
+        Path png = createTestImage(10, 10, "png");
+        Path webp = tempDir.resolve("detect.webp");
+        new ProcessBuilder("cwebp", png.toAbsolutePath().toString(), "-o", webp.toAbsolutePath().toString())
                 .redirectErrorStream(true).start().waitFor();
         assertEquals("webp", ImageIOHandler.detectFormat(webp));
     }
 
     @Test
     void detectFormatFromInputStream() throws IOException {
-        File file = createTestImage(10, 10, "png");
-        try (InputStream is = new BufferedInputStream(new FileInputStream(file))) {
+        Path file = createTestImage(10, 10, "png");
+        try (InputStream is = new BufferedInputStream(Files.newInputStream(file))) {
             assertEquals("png", ImageIOHandler.detectFormat(is));
             // Stream should still be readable after detection (mark/reset)
             BufferedImage img = ImageIO.read(is);
@@ -235,10 +236,8 @@ class ImageIOHandlerTest {
     @Test
     void detectFormatFallsBackToExtension() throws IOException {
         // Create a file with unknown content but valid extension
-        File file = tempDir.resolve("fallback.png").toFile();
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(new byte[]{0x00, 0x00, 0x00}); // garbage bytes
-        }
+        Path file = tempDir.resolve("fallback.png");
+        Files.write(file, new byte[]{0x00, 0x00, 0x00}); // garbage bytes
         assertEquals("png", ImageIOHandler.detectFormat(file));
     }
 
@@ -246,10 +245,10 @@ class ImageIOHandlerTest {
 
     @Test
     void streamReadWriteRoundTrip() throws IOException {
-        File file = createTestImage(60, 40, "png");
+        Path file = createTestImage(60, 40, "png");
 
         BufferedImage image;
-        try (InputStream is = new FileInputStream(file)) {
+        try (InputStream is = Files.newInputStream(file)) {
             image = ImageIOHandler.read(is, "png");
         }
         assertEquals(60, image.getWidth());
@@ -283,10 +282,10 @@ class ImageIOHandlerTest {
 
     // --- Helpers ---
 
-    private File createTestImage(int width, int height, String format) throws IOException {
+    private Path createTestImage(int width, int height, String format) throws IOException {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        File file = tempDir.resolve("input." + format).toFile();
-        ImageIO.write(img, format, file);
+        Path file = tempDir.resolve("input." + format);
+        ImageIO.write(img, format, file.toFile());
         return file;
     }
 

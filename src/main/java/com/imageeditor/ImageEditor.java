@@ -11,6 +11,9 @@ import com.imageeditor.operation.ResizeOperation;
 
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,14 +35,14 @@ public class ImageEditor {
         return new Builder();
     }
 
-    public void process(File inputFile, File outputFile) {
-        BufferedImage image = ImageIOHandler.read(inputFile);
+    public void process(Path inputPath, Path outputPath) {
+        BufferedImage image = ImageIOHandler.read(inputPath);
 
         for (Operation op : operations) {
             image = op.apply(image);
         }
 
-        ImageIOHandler.write(image, outputFile, outputOptions);
+        ImageIOHandler.write(image, outputPath, outputOptions);
     }
 
     public void process(InputStream input, OutputStream output, String outputFormat) {
@@ -61,38 +64,39 @@ public class ImageEditor {
         ImageIOHandler.write(image, output, outputFormat, outputOptions);
     }
 
-    public void processDirectory(File inputDir, File outputDir) {
+    public void processDirectory(Path inputDir, Path outputDir) {
         processDirectory(inputDir, outputDir, 1);
     }
 
-    public void processDirectory(File inputDir, File outputDir, int parallelism) {
-        if (!inputDir.isDirectory()) {
+    public void processDirectory(Path inputDir, Path outputDir, int parallelism) {
+        if (!Files.isDirectory(inputDir)) {
             throw new ImageEditorException("Input path is not a directory: " + inputDir);
         }
-        if (!outputDir.exists() && !outputDir.mkdirs()) {
-            throw new ImageEditorException("Could not create output directory: " + outputDir);
+        try {
+            Files.createDirectories(outputDir);
+        } catch (IOException e) {
+            throw new ImageEditorException("Could not create output directory: " + outputDir, e);
         }
 
-        File[] files = inputDir.listFiles();
-        if (files == null) {
-            return;
-        }
-
-        List<File> imageFiles = new ArrayList<>();
-        for (File f : files) {
-            if (f.isFile() && isSupportedImage(f)) {
-                imageFiles.add(f);
+        List<Path> imageFiles = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(inputDir)) {
+            for (Path f : stream) {
+                if (Files.isRegularFile(f) && isSupportedImage(f)) {
+                    imageFiles.add(f);
+                }
             }
+        } catch (IOException e) {
+            throw new ImageEditorException("Failed to list directory: " + inputDir, e);
         }
 
         if (parallelism <= 1) {
-            for (File f : imageFiles) {
+            for (Path f : imageFiles) {
                 processOne(f, outputDir);
             }
         } else {
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             List<ImageEditorException> errors = Collections.synchronizedList(new ArrayList<>());
-            for (File f : imageFiles) {
+            for (Path f : imageFiles) {
                 pool.submit(() -> {
                     try {
                         processOne(f, outputDir);
@@ -114,14 +118,14 @@ public class ImageEditor {
         }
     }
 
-    private void processOne(File inputFile, File outputDir) {
-        File outputFile = new File(outputDir, inputFile.getName());
+    private void processOne(Path inputFile, Path outputDir) {
+        Path outputFile = outputDir.resolve(inputFile.getFileName());
         process(inputFile, outputFile);
     }
 
-    private boolean isSupportedImage(File file) {
+    private boolean isSupportedImage(Path path) {
         try {
-            String ext = ImageIOHandler.getExtension(file.getName());
+            String ext = ImageIOHandler.getExtension(path.getFileName().toString());
             return ImageIOHandler.isFormatSupported(ext);
         } catch (ImageEditorException e) {
             return false;

@@ -9,6 +9,8 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -24,45 +26,45 @@ public class ImageIOHandler {
     );
     private static final long TIMEOUT_SECONDS = 30;
 
-    // --- File-based read/write ---
+    // --- Path-based read/write ---
 
-    public static BufferedImage read(File file) {
-        String ext = getExtension(file.getName());
+    public static BufferedImage read(Path path) {
+        String ext = getExtension(path.getFileName().toString());
 
         try {
             if (STANDARD_FORMATS.contains(ext)) {
-                return readStandard(file);
+                return readStandard(path);
             } else if ("webp".equals(ext)) {
-                return readViaCliToPng(file, "dwebp", file.getAbsolutePath(), "-o");
+                return readViaCliToPng(path, "dwebp", path.toAbsolutePath().toString(), "-o");
             } else if ("avif".equals(ext)) {
-                return readViaCliToPng(file, "heif-dec", file.getAbsolutePath());
+                return readViaCliToPng(path, "heif-dec", path.toAbsolutePath().toString());
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
             }
         } catch (IOException e) {
-            throw new ImageEditorException("Failed to read image: " + file, e);
+            throw new ImageEditorException("Failed to read image: " + path, e);
         }
     }
 
-    public static void write(BufferedImage image, File file) {
-        write(image, file, OutputOptions.defaults());
+    public static void write(BufferedImage image, Path path) {
+        write(image, path, OutputOptions.defaults());
     }
 
-    public static void write(BufferedImage image, File file, OutputOptions options) {
-        String ext = getExtension(file.getName());
+    public static void write(BufferedImage image, Path path, OutputOptions options) {
+        String ext = getExtension(path.getFileName().toString());
 
         try {
             if (STANDARD_FORMATS.contains(ext)) {
-                writeStandard(image, ext, file, options);
+                writeStandard(image, ext, path, options);
             } else if ("webp".equals(ext)) {
-                writeViaCliFromPng(image, file, options, "cwebp", null, "-o", file.getAbsolutePath());
+                writeViaCliFromPng(image, path, options, "cwebp", null, "-o", path.toAbsolutePath().toString());
             } else if ("avif".equals(ext)) {
-                writeViaCliFromPng(image, file, options, "heif-enc", null, "-o", file.getAbsolutePath());
+                writeViaCliFromPng(image, path, options, "heif-enc", null, "-o", path.toAbsolutePath().toString());
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
             }
         } catch (IOException e) {
-            throw new ImageEditorException("Failed to write image: " + file, e);
+            throw new ImageEditorException("Failed to write image: " + path, e);
         }
     }
 
@@ -79,14 +81,14 @@ public class ImageIOHandler {
                 }
                 return image;
             } else if ("webp".equals(ext) || "avif".equals(ext)) {
-                File tmpInput = File.createTempFile("imageeditor-in-", "." + ext);
+                Path tmpInput = Files.createTempFile("imageeditor-in-", "." + ext);
                 try {
-                    try (OutputStream out = new FileOutputStream(tmpInput)) {
+                    try (OutputStream out = Files.newOutputStream(tmpInput)) {
                         input.transferTo(out);
                     }
                     return read(tmpInput);
                 } finally {
-                    tmpInput.delete();
+                    Files.deleteIfExists(tmpInput);
                 }
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
@@ -103,14 +105,14 @@ public class ImageIOHandler {
             if (STANDARD_FORMATS.contains(ext)) {
                 writeStandardToStream(image, ext, output, options);
             } else if ("webp".equals(ext) || "avif".equals(ext)) {
-                File tmpOutput = File.createTempFile("imageeditor-out-", "." + ext);
+                Path tmpOutput = Files.createTempFile("imageeditor-out-", "." + ext);
                 try {
                     write(image, tmpOutput, options);
-                    try (InputStream in = new FileInputStream(tmpOutput)) {
+                    try (InputStream in = Files.newInputStream(tmpOutput)) {
                         in.transferTo(output);
                     }
                 } finally {
-                    tmpOutput.delete();
+                    Files.deleteIfExists(tmpOutput);
                 }
             } else {
                 throw new ImageEditorException("Unsupported image format: " + ext);
@@ -122,8 +124,8 @@ public class ImageIOHandler {
 
     // --- Format detection ---
 
-    public static String detectFormat(File file) {
-        try (InputStream is = new FileInputStream(file)) {
+    public static String detectFormat(Path path) {
+        try (InputStream is = Files.newInputStream(path)) {
             String detected = detectFromMagicBytes(is);
             if (detected != null) {
                 return detected;
@@ -131,7 +133,7 @@ public class ImageIOHandler {
         } catch (IOException ignored) {
         }
         try {
-            return getExtension(file.getName());
+            return getExtension(path.getFileName().toString());
         } catch (ImageEditorException e) {
             return null;
         }
@@ -231,31 +233,31 @@ public class ImageIOHandler {
         }
     }
 
-    private static BufferedImage readStandard(File file) throws IOException {
-        BufferedImage image = ImageIO.read(file);
+    private static BufferedImage readStandard(Path path) throws IOException {
+        BufferedImage image = ImageIO.read(path.toFile());
         if (image == null) {
-            throw new ImageEditorException("Could not read image: " + file);
+            throw new ImageEditorException("Could not read image: " + path);
         }
         return image;
     }
 
-    private static void writeStandard(BufferedImage image, String format, File file, OutputOptions options)
+    private static void writeStandard(BufferedImage image, String format, Path path, OutputOptions options)
             throws IOException {
         String writeFormat = "jpg".equals(format) ? "jpeg" : format;
 
         if (options.getQuality() != null && ("jpeg".equals(writeFormat) || "jpg".equals(format))) {
-            writeWithQuality(image, writeFormat, file, options);
+            writeWithQuality(image, writeFormat, path, options);
         } else if (options.isStripMetadata()) {
-            writeWithWriter(image, writeFormat, file, null);
+            writeWithWriter(image, writeFormat, path, null);
         } else {
-            boolean written = ImageIO.write(image, writeFormat, file);
+            boolean written = ImageIO.write(image, writeFormat, path.toFile());
             if (!written) {
                 throw new ImageEditorException("No writer found for format: " + format);
             }
         }
     }
 
-    private static void writeWithQuality(BufferedImage image, String writeFormat, File file, OutputOptions options)
+    private static void writeWithQuality(BufferedImage image, String writeFormat, Path path, OutputOptions options)
             throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(writeFormat);
         if (!writers.hasNext()) {
@@ -272,7 +274,7 @@ public class ImageIOHandler {
                 }
                 param.setCompressionQuality(options.getQuality());
             }
-            try (ImageOutputStream ios = ImageIO.createImageOutputStream(file)) {
+            try (ImageOutputStream ios = ImageIO.createImageOutputStream(path.toFile())) {
                 writer.setOutput(ios);
                 writer.write(null, new IIOImage(image, null, null), param);
             }
@@ -281,7 +283,7 @@ public class ImageIOHandler {
         }
     }
 
-    private static void writeWithWriter(BufferedImage image, String writeFormat, File file,
+    private static void writeWithWriter(BufferedImage image, String writeFormat, Path path,
                                         ImageWriteParam param) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(writeFormat);
         if (!writers.hasNext()) {
@@ -289,7 +291,7 @@ public class ImageIOHandler {
         }
         ImageWriter writer = writers.next();
         try {
-            try (ImageOutputStream ios = ImageIO.createImageOutputStream(file)) {
+            try (ImageOutputStream ios = ImageIO.createImageOutputStream(path.toFile())) {
                 writer.setOutput(ios);
                 writer.write(null, new IIOImage(image, null, null), param);
             }
@@ -326,26 +328,26 @@ public class ImageIOHandler {
         }
     }
 
-    private static BufferedImage readViaCliToPng(File inputFile, String... commandParts) throws IOException {
-        File tmpPng = File.createTempFile("imageeditor-", ".png");
+    private static BufferedImage readViaCliToPng(Path inputPath, String... commandParts) throws IOException {
+        Path tmpPng = Files.createTempFile("imageeditor-", ".png");
         try {
-            String[] command = appendArg(commandParts, tmpPng.getAbsolutePath());
+            String[] command = appendArg(commandParts, tmpPng.toAbsolutePath().toString());
             runProcess(command);
             return readStandard(tmpPng);
         } finally {
-            tmpPng.delete();
+            Files.deleteIfExists(tmpPng);
         }
     }
 
-    private static void writeViaCliFromPng(BufferedImage image, File outputFile, OutputOptions options,
+    private static void writeViaCliFromPng(BufferedImage image, Path outputPath, OutputOptions options,
                                            String... commandParts) throws IOException {
-        File tmpPng = File.createTempFile("imageeditor-", ".png");
+        Path tmpPng = Files.createTempFile("imageeditor-", ".png");
         try {
-            ImageIO.write(image, "png", tmpPng);
+            ImageIO.write(image, "png", tmpPng.toFile());
             // Build command, replacing null placeholder with tmp png path
             java.util.ArrayList<String> command = new java.util.ArrayList<>();
             for (String part : commandParts) {
-                command.add(part == null ? tmpPng.getAbsolutePath() : part);
+                command.add(part == null ? tmpPng.toAbsolutePath().toString() : part);
             }
             // Insert quality flag if specified
             if (options.getQuality() != null) {
@@ -356,7 +358,7 @@ public class ImageIOHandler {
             }
             runProcess(command.toArray(new String[0]));
         } finally {
-            tmpPng.delete();
+            Files.deleteIfExists(tmpPng);
         }
     }
 

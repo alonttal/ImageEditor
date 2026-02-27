@@ -7,8 +7,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,8 +32,8 @@ class ImageEditorWebpAvifTest {
     void resizeWebp() throws Exception {
         assumeTrue(webpAvailable, "WebP tools not installed, skipping");
 
-        File webpInput = createWebpImage(200, 150);
-        File webpOutput = tempDir.resolve("resized.webp").toFile();
+        Path webpInput = createWebpImage(200, 150);
+        Path webpOutput = tempDir.resolve("resized.webp");
 
         ImageEditor.builder()
                 .resize(100, 75)
@@ -49,8 +49,8 @@ class ImageEditorWebpAvifTest {
     void cropWebp() throws Exception {
         assumeTrue(webpAvailable, "WebP tools not installed, skipping");
 
-        File webpInput = createWebpImage(200, 200);
-        File webpOutput = tempDir.resolve("cropped.webp").toFile();
+        Path webpInput = createWebpImage(200, 200);
+        Path webpOutput = tempDir.resolve("cropped.webp");
 
         ImageEditor.builder()
                 .crop(10, 10, 100, 80)
@@ -66,8 +66,8 @@ class ImageEditorWebpAvifTest {
     void coverWebp() throws Exception {
         assumeTrue(webpAvailable, "WebP tools not installed, skipping");
 
-        File webpInput = createWebpImage(300, 200);
-        File webpOutput = tempDir.resolve("covered.webp").toFile();
+        Path webpInput = createWebpImage(300, 200);
+        Path webpOutput = tempDir.resolve("covered.webp");
 
         ImageEditor.builder()
                 .cover(100, 100)
@@ -83,8 +83,8 @@ class ImageEditorWebpAvifTest {
     void resizeAvif() throws Exception {
         assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
 
-        File avifInput = createAvifImage(200, 150);
-        File avifOutput = tempDir.resolve("resized.avif").toFile();
+        Path avifInput = createAvifImage(200, 150);
+        Path avifOutput = tempDir.resolve("resized.avif");
 
         ImageEditor.builder()
                 .resize(100, 75)
@@ -100,8 +100,8 @@ class ImageEditorWebpAvifTest {
     void cropAvif() throws Exception {
         assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
 
-        File avifInput = createAvifImage(200, 200);
-        File avifOutput = tempDir.resolve("cropped.avif").toFile();
+        Path avifInput = createAvifImage(200, 200);
+        Path avifOutput = tempDir.resolve("cropped.avif");
 
         ImageEditor.builder()
                 .crop(10, 10, 100, 80)
@@ -117,39 +117,39 @@ class ImageEditorWebpAvifTest {
     void webpToPngConversion() throws Exception {
         assumeTrue(webpAvailable, "WebP tools not installed, skipping");
 
-        File webpInput = createWebpImage(120, 90);
-        File pngOutput = tempDir.resolve("output.png").toFile();
+        Path webpInput = createWebpImage(120, 90);
+        Path pngOutput = tempDir.resolve("output.png");
 
         ImageEditor.builder()
                 .resize(60, 45)
                 .build()
                 .process(webpInput, pngOutput);
 
-        BufferedImage result = ImageIO.read(pngOutput);
+        BufferedImage result = ImageIO.read(pngOutput.toFile());
         assertEquals(60, result.getWidth());
         assertEquals(45, result.getHeight());
     }
 
-    private File createWebpImage(int width, int height) throws IOException, InterruptedException {
+    private Path createWebpImage(int width, int height) throws IOException, InterruptedException {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        File png = tempDir.resolve("src_" + width + "x" + height + ".png").toFile();
-        ImageIO.write(img, "png", png);
+        Path png = tempDir.resolve("src_" + width + "x" + height + ".png");
+        ImageIO.write(img, "png", png.toFile());
 
-        File webp = tempDir.resolve("src_" + width + "x" + height + ".webp").toFile();
-        Process p = new ProcessBuilder("cwebp", png.getAbsolutePath(), "-o", webp.getAbsolutePath())
+        Path webp = tempDir.resolve("src_" + width + "x" + height + ".webp");
+        Process p = new ProcessBuilder("cwebp", png.toAbsolutePath().toString(), "-o", webp.toAbsolutePath().toString())
                 .redirectErrorStream(true).start();
         p.waitFor();
         assertEquals(0, p.exitValue(), "cwebp failed");
         return webp;
     }
 
-    private File createAvifImage(int width, int height) throws IOException, InterruptedException {
+    private Path createAvifImage(int width, int height) throws IOException, InterruptedException {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        File png = tempDir.resolve("src_" + width + "x" + height + ".png").toFile();
-        ImageIO.write(img, "png", png);
+        Path png = tempDir.resolve("src_" + width + "x" + height + ".png");
+        ImageIO.write(img, "png", png.toFile());
 
-        File avif = tempDir.resolve("src_" + width + "x" + height + ".avif").toFile();
-        Process p = new ProcessBuilder("heif-enc", png.getAbsolutePath(), "-o", avif.getAbsolutePath())
+        Path avif = tempDir.resolve("src_" + width + "x" + height + ".avif");
+        Process p = new ProcessBuilder("heif-enc", png.toAbsolutePath().toString(), "-o", avif.toAbsolutePath().toString())
                 .redirectErrorStream(true).start();
         p.waitFor();
         assertEquals(0, p.exitValue(), "heif-enc failed");

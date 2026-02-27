@@ -20,23 +20,23 @@ class ImageEditorTest {
 
     @Test
     void resizeImage() throws IOException {
-        File input = createTestImage(100, 100, "png");
-        File output = tempDir.resolve("output.png").toFile();
+        Path input = createTestImage(100, 100, "png");
+        Path output = tempDir.resolve("output.png");
 
         ImageEditor.builder()
                 .resize(50, 50)
                 .build()
                 .process(input, output);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(50, result.getWidth());
         assertEquals(50, result.getHeight());
     }
 
     @Test
     void chainMultipleResizes() throws IOException {
-        File input = createTestImage(200, 200, "png");
-        File output = tempDir.resolve("output.png").toFile();
+        Path input = createTestImage(200, 200, "png");
+        Path output = tempDir.resolve("output.png");
 
         ImageEditor.builder()
                 .resize(100, 100)
@@ -44,7 +44,7 @@ class ImageEditorTest {
                 .build()
                 .process(input, output);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(50, result.getWidth());
         assertEquals(25, result.getHeight());
     }
@@ -55,16 +55,16 @@ class ImageEditorTest {
                 .resize(30, 30)
                 .build();
 
-        File input1 = createTestImage(100, 100, "png");
-        File output1 = tempDir.resolve("out1.png").toFile();
+        Path input1 = createTestImage(100, 100, "png");
+        Path output1 = tempDir.resolve("out1.png");
         editor.process(input1, output1);
 
-        File input2 = createTestImage(200, 150, "png");
-        File output2 = tempDir.resolve("out2.png").toFile();
+        Path input2 = createTestImage(200, 150, "png");
+        Path output2 = tempDir.resolve("out2.png");
         editor.process(input2, output2);
 
-        assertEquals(30, ImageIO.read(output1).getWidth());
-        assertEquals(30, ImageIO.read(output2).getWidth());
+        assertEquals(30, ImageIO.read(output1.toFile()).getWidth());
+        assertEquals(30, ImageIO.read(output2.toFile()).getWidth());
     }
 
     // --- Quality + metadata builder tests ---
@@ -72,11 +72,11 @@ class ImageEditorTest {
     @Test
     void qualityBuilderProducesDifferentSizes() throws IOException {
         BufferedImage rich = createRichTestImage(200, 200);
-        File richInput = tempDir.resolve("rich.png").toFile();
-        ImageIO.write(rich, "png", richInput);
+        Path richInput = tempDir.resolve("rich.png");
+        ImageIO.write(rich, "png", richInput.toFile());
 
-        File highOutput = tempDir.resolve("high.jpg").toFile();
-        File lowOutput = tempDir.resolve("low.jpg").toFile();
+        Path highOutput = tempDir.resolve("high.jpg");
+        Path lowOutput = tempDir.resolve("low.jpg");
 
         ImageEditor.builder()
                 .quality(0.95f)
@@ -88,22 +88,22 @@ class ImageEditorTest {
                 .build()
                 .process(richInput, lowOutput);
 
-        assertTrue(highOutput.length() > lowOutput.length(),
-                "High quality (" + highOutput.length() + ") should be larger than low quality ("
-                        + lowOutput.length() + ")");
+        assertTrue(Files.size(highOutput) > Files.size(lowOutput),
+                "High quality (" + Files.size(highOutput) + ") should be larger than low quality ("
+                        + Files.size(lowOutput) + ")");
     }
 
     @Test
     void stripMetadataBuilder() throws IOException {
-        File input = createTestImage(50, 50, "png");
-        File output = tempDir.resolve("stripped.png").toFile();
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("stripped.png");
 
         ImageEditor.builder()
                 .stripMetadata()
                 .build()
                 .process(input, output);
 
-        BufferedImage result = ImageIO.read(output);
+        BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(50, result.getWidth());
         assertEquals(50, result.getHeight());
     }
@@ -118,10 +118,10 @@ class ImageEditorTest {
 
     @Test
     void processStream() throws IOException {
-        File input = createTestImage(100, 80, "png");
+        Path input = createTestImage(100, 80, "png");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (InputStream is = new FileInputStream(input)) {
+        try (InputStream is = Files.newInputStream(input)) {
             ImageEditor.builder()
                     .resize(50, 40)
                     .build()
@@ -136,11 +136,11 @@ class ImageEditorTest {
     @Test
     void processStreamWithQuality() throws IOException {
         BufferedImage rich = createRichTestImage(200, 200);
-        File richInput = tempDir.resolve("rich_stream.png").toFile();
-        ImageIO.write(rich, "png", richInput);
+        Path richInput = tempDir.resolve("rich_stream.png");
+        ImageIO.write(rich, "png", richInput.toFile());
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (InputStream is = new FileInputStream(richInput)) {
+        try (InputStream is = Files.newInputStream(richInput)) {
             ImageEditor.builder()
                     .quality(0.5f)
                     .build()
@@ -170,17 +170,22 @@ class ImageEditorTest {
         ImageEditor.builder()
                 .resize(50, 50)
                 .build()
-                .processDirectory(inputDir.toFile(), outputDir.toFile());
+                .processDirectory(inputDir, outputDir);
 
-        assertTrue(outputDir.toFile().exists());
-        File[] outputs = outputDir.toFile().listFiles();
-        assertNotNull(outputs);
-        assertEquals(3, outputs.length);
+        assertTrue(Files.exists(outputDir));
+        long count = Files.list(outputDir).count();
+        assertEquals(3, count);
 
-        for (File out : outputs) {
-            BufferedImage img = ImageIO.read(out);
-            assertEquals(50, img.getWidth());
-            assertEquals(50, img.getHeight());
+        try (var stream = Files.list(outputDir)) {
+            stream.forEach(out -> {
+                try {
+                    BufferedImage img = ImageIO.read(out.toFile());
+                    assertEquals(50, img.getWidth());
+                    assertEquals(50, img.getHeight());
+                } catch (IOException e) {
+                    fail("Failed to read output image: " + out);
+                }
+            });
         }
     }
 
@@ -196,25 +201,30 @@ class ImageEditorTest {
         ImageEditor.builder()
                 .resize(40, 40)
                 .build()
-                .processDirectory(inputDir.toFile(), outputDir.toFile(), 2);
+                .processDirectory(inputDir, outputDir, 2);
 
-        File[] outputs = outputDir.toFile().listFiles();
-        assertNotNull(outputs);
-        assertEquals(2, outputs.length);
+        long count = Files.list(outputDir).count();
+        assertEquals(2, count);
 
-        for (File out : outputs) {
-            BufferedImage img = ImageIO.read(out);
-            assertEquals(40, img.getWidth());
-            assertEquals(40, img.getHeight());
+        try (var stream = Files.list(outputDir)) {
+            stream.forEach(out -> {
+                try {
+                    BufferedImage img = ImageIO.read(out.toFile());
+                    assertEquals(40, img.getWidth());
+                    assertEquals(40, img.getHeight());
+                } catch (IOException e) {
+                    fail("Failed to read output image: " + out);
+                }
+            });
         }
     }
 
     // --- Helpers ---
 
-    private File createTestImage(int width, int height, String format) throws IOException {
+    private Path createTestImage(int width, int height, String format) throws IOException {
         BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        File file = tempDir.resolve("input." + format).toFile();
-        ImageIO.write(img, format, file);
+        Path file = tempDir.resolve("input." + format);
+        ImageIO.write(img, format, file.toFile());
         return file;
     }
 
