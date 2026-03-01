@@ -213,10 +213,12 @@ public class ImageIOHandler {
      * Detects the image format by inspecting the stream's leading bytes.
      *
      * <p>The stream is marked and reset so that it can still be read
-     * afterwards.
+     * afterwards. The stream must support {@link InputStream#mark(int)};
+     * if it does not, wrap it in a {@link BufferedInputStream} first.
      *
      * @param input an input stream that supports {@link InputStream#mark(int)}
      * @return the detected format, or {@code null} if detection fails
+     * @throws IllegalArgumentException if the stream does not support mark/reset
      * @see FormatDetector#detectFormat(InputStream)
      */
     public static ImageFormat detectFormat(InputStream input) {
@@ -292,6 +294,10 @@ public class ImageIOHandler {
                 param.setCompressionQuality(options.quality());
             }
             try (ImageOutputStream ios = ImageIO.createImageOutputStream(target)) {
+                if (ios == null) {
+                    throw new ImageEditorException(
+                            "Could not create image output stream for target: " + target.getClass().getSimpleName());
+                }
                 writer.setOutput(ios);
                 writer.write(null, new IIOImage(image, null, null), param);
             }

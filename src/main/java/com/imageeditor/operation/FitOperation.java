@@ -23,8 +23,8 @@ public record FitOperation(int maxWidth, int maxHeight) implements Operation {
         double scaleY = (double) maxHeight / image.getHeight();
         double scale = Math.min(scaleX, scaleY);
 
-        int scaledWidth = (int) Math.round(image.getWidth() * scale);
-        int scaledHeight = (int) Math.round(image.getHeight() * scale);
+        int scaledWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
+        int scaledHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
 
         return ImageScaler.scale(image, scaledWidth, scaledHeight);
     }

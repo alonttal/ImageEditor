@@ -2,7 +2,6 @@ package com.imageeditor.io;
 
 import com.imageeditor.exception.ImageEditorException;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -44,16 +43,18 @@ public class FormatDetector {
      * Detects the image format by inspecting the leading bytes of the stream.
      *
      * <p>The stream is marked before reading and reset afterwards, so it can
-     * still be consumed by the caller. If the stream does not support
-     * {@link InputStream#mark(int)}, it is automatically wrapped in a
-     * {@link BufferedInputStream}.
+     * still be consumed by the caller. The stream must support
+     * {@link InputStream#mark(int)}; if it does not, wrap it in a
+     * {@link BufferedInputStream} before calling this method.
      *
-     * @param input the image input stream
+     * @param input the image input stream (must support mark/reset)
      * @return the detected format, or {@code null} if detection fails
+     * @throws IllegalArgumentException if the stream does not support mark/reset
      */
     public static ImageFormat detectFormat(InputStream input) {
         if (!input.markSupported()) {
-            input = new BufferedInputStream(input);
+            throw new IllegalArgumentException(
+                    "Stream must support mark/reset; wrap it in a BufferedInputStream");
         }
         try {
             input.mark(12);

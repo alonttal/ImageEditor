@@ -177,6 +177,9 @@ public class ImageEditor {
                             processOne(f, outputDir);
                         } catch (ImageEditorException e) {
                             errors.add(e);
+                        } catch (Exception e) {
+                            errors.add(new ImageEditorException(
+                                    "Failed to process image: " + f, e));
                         }
                     });
                 }
