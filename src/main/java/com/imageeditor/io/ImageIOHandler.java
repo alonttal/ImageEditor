@@ -114,7 +114,7 @@ public class ImageIOHandler {
             } else if (format == ImageFormat.WEBP) {
                 writeViaCliFromPng(image, path, options, CliToolRunner.resolveToolPath("cwebp"), null, "-o", path.toAbsolutePath().toString());
             } else if (format == ImageFormat.AVIF) {
-                writeViaCliFromPng(image, path, options, CliToolRunner.resolveToolPath("heif-enc"), null, "-o", path.toAbsolutePath().toString());
+                writeAvif(image, path, options);
             } else {
                 throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
@@ -332,6 +332,55 @@ public class ImageIOHandler {
         } finally {
             Files.deleteIfExists(tmpPng);
         }
+    }
+
+    private static void writeAvif(BufferedImage image, Path outputPath, OutputOptions options) throws IOException {
+        Path tmpPng = Files.createTempFile("imageeditor-", ".png");
+        try {
+            // Write as 16-bit PNG so heif-enc can produce 10-bit AVIF output.
+            // 10-bit encoding improves quantization precision, reducing banding
+            // and often producing smaller files than 8-bit at the same quality.
+            write16BitPng(image, tmpPng);
+
+            ArrayList<String> command = new ArrayList<>();
+            command.add(CliToolRunner.resolveToolPath("heif-enc"));
+            if (options.quality() != null) {
+                int qValue = Math.round(options.quality() * 100);
+                command.add("-q");
+                command.add(String.valueOf(qValue));
+            }
+            // 10-bit depth for smoother gradients and better compression
+            command.add("-b");
+            command.add("10");
+            // Full chroma (4:4:4) to avoid color smearing on edges
+            command.add("-p");
+            command.add("chroma=444");
+            command.add(tmpPng.toAbsolutePath().toString());
+            command.add("-o");
+            command.add(outputPath.toAbsolutePath().toString());
+
+            CliToolRunner.runProcess(command.toArray(new String[0]));
+        } finally {
+            Files.deleteIfExists(tmpPng);
+        }
+    }
+
+    private static void write16BitPng(BufferedImage image, Path path) throws IOException {
+        int w = image.getWidth();
+        int h = image.getHeight();
+        boolean hasAlpha = image.getColorModel().hasAlpha();
+
+        java.awt.color.ColorSpace srgb = java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB);
+        java.awt.image.ColorModel cm = new java.awt.image.ComponentColorModel(
+                srgb, hasAlpha, false,
+                hasAlpha ? Transparency.TRANSLUCENT : Transparency.OPAQUE,
+                java.awt.image.DataBuffer.TYPE_USHORT);
+        java.awt.image.WritableRaster raster = cm.createCompatibleWritableRaster(w, h);
+        BufferedImage img16 = new BufferedImage(cm, raster, false, null);
+        Graphics2D g = img16.createGraphics();
+        g.drawImage(image, 0, 0, null);
+        g.dispose();
+        ImageIO.write(img16, "png", path.toFile());
     }
 
     private static void writeViaCliFromPng(BufferedImage image, Path outputPath, OutputOptions options,

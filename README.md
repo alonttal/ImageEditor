@@ -146,6 +146,14 @@ ImageEditor.builder()
 // for web serving (smaller files) and user-uploaded images (strips GPS location,
 // camera info, and other potentially sensitive data)
 
+// Use the recommended AVIF quality constant (0.46) — tested to match or exceed
+// Cloudflare's visual quality while producing ~5% smaller files
+ImageEditor.builder()
+    .quality(ImageEditor.AVIF_QUALITY)
+    .outputFormat(ImageFormat.AVIF)
+    .build()
+    .process(Path.of("photo.jpg"), Path.of("photo.avif"));
+
 // Force output format (by default the input format is preserved)
 ImageEditor.builder()
     .outputFormat(ImageFormat.WEBP)

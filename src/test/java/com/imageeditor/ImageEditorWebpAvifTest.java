@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,11 +24,13 @@ class ImageEditorWebpAvifTest {
 
     private static boolean webpAvailable;
     private static boolean avifAvailable;
+    private static boolean heifInfoAvailable;
 
     @BeforeAll
     static void checkTools() {
         webpAvailable = CliToolRunner.isToolAvailable("cwebp") && CliToolRunner.isToolAvailable("dwebp");
         avifAvailable = CliToolRunner.isToolAvailable("heif-enc") && CliToolRunner.isToolAvailable("heif-dec");
+        heifInfoAvailable = CliToolRunner.isToolAvailable("heif-info");
     }
 
     @Test
@@ -248,6 +251,109 @@ class ImageEditorWebpAvifTest {
 
         assertTrue(Files.exists(avifOutput));
         assertTrue(Files.size(avifOutput) > 0);
+    }
+
+    @Test
+    void avifOutput10BitAnd444Chroma() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+        assumeTrue(heifInfoAvailable, "heif-info not installed, skipping");
+
+        // Create a colorful gradient image to encode
+        BufferedImage img = createGradientImage(200, 150);
+        Path pngInput = tempDir.resolve("gradient.png");
+        ImageIO.write(img, "png", pngInput.toFile());
+        Path avifOutput = tempDir.resolve("gradient.avif");
+
+        ImageEditor.builder()
+                .quality(ImageEditor.AVIF_QUALITY)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, avifOutput);
+
+        // Verify 10-bit depth and 4:4:4 chroma via heif-info
+        Process p = new ProcessBuilder("heif-info", avifOutput.toAbsolutePath().toString())
+                .redirectErrorStream(true).start();
+        String info = new String(p.getInputStream().readAllBytes());
+        p.waitFor();
+        assertEquals(0, p.exitValue(), "heif-info failed: " + info);
+        assertTrue(info.contains("bit depth: 10"), "Expected 10-bit depth, got: " + info);
+        assertTrue(info.contains("4:4:4"), "Expected 4:4:4 chroma, got: " + info);
+    }
+
+    @Test
+    void avifQualityAffectsFileSize() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        BufferedImage img = createGradientImage(200, 150);
+        Path pngInput = tempDir.resolve("gradient_q.png");
+        ImageIO.write(img, "png", pngInput.toFile());
+
+        Path lowQ = tempDir.resolve("low.avif");
+        Path highQ = tempDir.resolve("high.avif");
+
+        ImageEditor.builder()
+                .quality(0.20f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, lowQ);
+
+        ImageEditor.builder()
+                .quality(0.90f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, highQ);
+
+        assertTrue(Files.size(lowQ) < Files.size(highQ),
+                "Low quality (" + Files.size(lowQ) + "B) should be smaller than high quality (" + Files.size(highQ) + "B)");
+    }
+
+    @Test
+    void avifFromRgbaSource() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // Create an RGBA image with semi-transparent pixels
+        BufferedImage rgba = new BufferedImage(100, 100, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = rgba.createGraphics();
+        g.setColor(new Color(255, 0, 0, 128));
+        g.fillRect(0, 0, 50, 100);
+        g.setColor(new Color(0, 0, 255, 200));
+        g.fillRect(50, 0, 50, 100);
+        g.dispose();
+
+        Path pngInput = tempDir.resolve("rgba.png");
+        ImageIO.write(rgba, "png", pngInput.toFile());
+        Path avifOutput = tempDir.resolve("rgba.avif");
+
+        ImageEditor.builder()
+                .quality(0.5f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, avifOutput);
+
+        assertTrue(Files.exists(avifOutput));
+        assertTrue(Files.size(avifOutput) > 0);
+
+        BufferedImage result = ImageIOHandler.read(avifOutput);
+        assertEquals(100, result.getWidth());
+        assertEquals(100, result.getHeight());
+    }
+
+    @Test
+    void avifQualityConstant() {
+        assertEquals(0.46f, ImageEditor.AVIF_QUALITY);
+    }
+
+    private BufferedImage createGradientImage(int width, int height) {
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int r = (x * 255) / width;
+                int g = (y * 255) / height;
+                int b = ((x + y) * 255) / (width + height);
+                img.setRGB(x, y, (r << 16) | (g << 8) | b);
+            }
+        }
+        return img;
     }
 
     private Path createWebpImage(int width, int height) throws IOException, InterruptedException {

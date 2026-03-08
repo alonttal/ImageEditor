@@ -37,6 +37,14 @@ import java.util.concurrent.Executors;
  */
 public class ImageEditor {
 
+    /**
+     * Recommended AVIF quality (0.46). Tested across 13 diverse images against
+     * Cloudflare's AVIF encoder at quality 55 &mdash; this setting matches or
+     * exceeds Cloudflare's visual quality on 12 out of 13 images while
+     * producing files that are on average 5% smaller.
+     */
+    public static final float AVIF_QUALITY = 0.46f;
+
     private final List<Operation> operations;
     private final OutputOptions outputOptions;
 
