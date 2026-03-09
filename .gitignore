@@ -5,3 +5,5 @@ target/
 .idea/
 .DS_Store
 test-run/
+comparison/
+heif-smoke-test/
