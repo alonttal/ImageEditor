@@ -81,7 +81,7 @@ class ImageIOHandlerTest {
     @Test
     void readAndWriteAvif() throws IOException, InterruptedException {
         assumeTrue(CliToolRunner.isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
-        assumeTrue(CliToolRunner.isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
+        assumeTrue(CliToolRunner.resolveHeifDecoder() != null, "heif-dec/heif-convert not installed, skipping");
 
         // Create a PNG, then convert to AVIF via heif-enc
         Path png = createTestImage(64, 48, "png");
@@ -134,7 +134,7 @@ class ImageIOHandlerTest {
     @Test
     void avifSupportedWhenToolsInstalled() {
         assumeTrue(CliToolRunner.isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
-        assumeTrue(CliToolRunner.isToolAvailable("heif-dec"), "heif-dec not installed, skipping");
+        assumeTrue(CliToolRunner.resolveHeifDecoder() != null, "heif-dec/heif-convert not installed, skipping");
         assertTrue(ImageIOHandler.isFormatSupported(ImageFormat.AVIF));
     }
 

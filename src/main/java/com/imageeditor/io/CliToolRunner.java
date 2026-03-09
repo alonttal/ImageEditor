@@ -12,13 +12,15 @@ import java.util.concurrent.TimeUnit;
 /**
  * Manages discovery and execution of external CLI tools used to read/write
  * non-standard image formats (e.g. WebP via {@code cwebp}/{@code dwebp},
- * AVIF via {@code heif-enc}/{@code heif-dec}).
+ * AVIF via {@code heif-enc}/{@code heif-dec} or {@code heif-convert}).
  */
 public class CliToolRunner {
 
+    private static final String[] HEIF_DECODER_NAMES = {"heif-dec", "heif-convert"};
+
     private static final Map<ImageFormat, List<String>> CLI_TOOLS = Map.of(
             ImageFormat.WEBP, List.of("cwebp", "dwebp"),
-            ImageFormat.AVIF, List.of("heif-enc", "heif-dec")
+            ImageFormat.AVIF, List.of("heif-enc")
     );
     private static final long TIMEOUT_SECONDS = 30;
 
@@ -76,7 +78,27 @@ public class CliToolRunner {
         if (tools == null) {
             return false;
         }
+        if (format == ImageFormat.AVIF) {
+            return tools.stream().allMatch(CliToolRunner::isToolAvailable)
+                    && resolveHeifDecoder() != null;
+        }
         return tools.stream().allMatch(CliToolRunner::isToolAvailable);
+    }
+
+    /**
+     * Resolves the HEIF decoder tool name. Newer libheif versions ship
+     * {@code heif-dec}, while older versions use {@code heif-convert}.
+     * Both accept the same syntax: {@code <tool> input.avif output.png}.
+     *
+     * @return the resolved tool name, or {@code null} if neither is available
+     */
+    public static String resolveHeifDecoder() {
+        for (String name : HEIF_DECODER_NAMES) {
+            if (isToolAvailable(name)) {
+                return name;
+            }
+        }
+        return null;
     }
 
     /**

@@ -13,6 +13,7 @@ import com.imageeditor.operation.ScaleDownOperation;
 
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -122,6 +123,67 @@ public class ImageEditor {
             format = detectedFormat;
         }
         ImageIOHandler.write(image, output, format, outputOptions);
+    }
+
+    /**
+     * Fetches an image from the given {@link URI}, applies all configured
+     * operations, and writes the result to {@code outputPath}.
+     *
+     * <p>The input format is determined from the URI path extension when
+     * available, otherwise it is auto-detected from magic bytes. The output
+     * format defaults to the builder's {@link Builder#outputFormat(ImageFormat)}
+     * setting, falling back to the detected input format.
+     *
+     * <p>Supports any URI scheme that Java can open (http, https, file, etc.).
+     *
+     * @param uri        URI pointing to the source image
+     * @param outputPath path where the processed image will be written
+     * @throws ImageEditorException if fetching, reading, processing, or
+     *         writing fails
+     */
+    public void process(URI uri, Path outputPath) {
+        ImageFormat uriFormat = null;
+        String path = uri.getPath();
+        if (path != null) {
+            int lastSlash = path.lastIndexOf('/');
+            String fileName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+            if (fileName.contains(".")) {
+                try {
+                    uriFormat = ImageIOHandler.getFormat(fileName);
+                } catch (ImageEditorException ignored) {
+                    // extension not recognized — will detect from bytes
+                }
+            }
+        }
+
+        try (InputStream raw = uri.toURL().openStream();
+             BufferedInputStream buffered = new BufferedInputStream(raw)) {
+
+            ImageFormat detectedFormat = uriFormat;
+            if (detectedFormat == null) {
+                detectedFormat = ImageIOHandler.detectFormat(buffered);
+                if (detectedFormat == null) {
+                    throw new ImageEditorException(
+                            "Could not detect image format from URI: " + uri);
+                }
+            }
+
+            BufferedImage image = ImageIOHandler.read(buffered, detectedFormat);
+
+            for (Operation op : operations) {
+                image = op.apply(image);
+            }
+
+            ImageFormat format = outputOptions.outputFormat();
+            if (format == null) {
+                format = detectedFormat;
+            }
+            ImageIOHandler.write(image, outputPath, format, outputOptions);
+        } catch (ImageEditorException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ImageEditorException("Failed to process image from URI: " + uri, e);
+        }
     }
 
     /**

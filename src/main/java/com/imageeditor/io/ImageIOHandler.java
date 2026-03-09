@@ -63,7 +63,11 @@ public class ImageIOHandler {
             } else if (format == ImageFormat.WEBP) {
                 return readViaCliToPng(path, CliToolRunner.resolveToolPath("dwebp"), path.toAbsolutePath().toString(), "-o");
             } else if (format == ImageFormat.AVIF) {
-                return readViaCliToPng(path, CliToolRunner.resolveToolPath("heif-dec"), path.toAbsolutePath().toString());
+                String decoder = CliToolRunner.resolveHeifDecoder();
+                if (decoder == null) {
+                    throw new ImageEditorException("No HEIF decoder found (install heif-dec or heif-convert)");
+                }
+                return readViaCliToPng(path, CliToolRunner.resolveToolPath(decoder), path.toAbsolutePath().toString());
             } else {
                 throw new ImageEditorException("Unsupported image format: " + format.getExtension());
             }
@@ -311,7 +315,7 @@ public class ImageIOHandler {
     }
 
     private static BufferedImage removeAlpha(BufferedImage image) {
-        if (!image.getColorModel().hasAlpha()) {
+        if (!image.getColorModel().hasAlpha() && image.getType() != BufferedImage.TYPE_CUSTOM) {
             return image;
         }
         BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);

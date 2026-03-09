@@ -9,6 +9,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -540,6 +541,348 @@ class ImageEditorTest {
         BufferedImage result = ImageIO.read(output.toFile());
         assertEquals(50, result.getWidth());
         assertEquals(50, result.getHeight());
+    }
+
+    // --- URI-based process tests ---
+
+    @Test
+    void processFromFileUri() throws IOException {
+        Path input = createTestImage(100, 80, "png");
+        Path output = tempDir.resolve("uri_output.png");
+        URI uri = input.toUri();
+
+        ImageEditor.builder()
+                .resize(50, 40)
+                .build()
+                .process(uri, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+        assertEquals(40, result.getHeight());
+    }
+
+    @Test
+    void processFromFileUriWithFormatConversion() throws IOException {
+        Path input = createTestImage(60, 60, "png");
+        Path output = tempDir.resolve("uri_converted.jpg");
+        URI uri = input.toUri();
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.JPEG)
+                .quality(0.9f)
+                .build()
+                .process(uri, output);
+
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+    }
+
+    @Test
+    void processFromFileUriNoOperations() throws IOException {
+        Path input = createTestImage(70, 50, "png");
+        Path output = tempDir.resolve("uri_copy.png");
+        URI uri = input.toUri();
+
+        ImageEditor.builder().build().process(uri, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(70, result.getWidth());
+        assertEquals(50, result.getHeight());
+    }
+
+    @Test
+    void processFromUriNonExistentThrows() {
+        Path missing = tempDir.resolve("nonexistent.png");
+        URI uri = missing.toUri();
+        Path output = tempDir.resolve("uri_fail.png");
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().process(uri, output));
+    }
+
+    @Test
+    void processFromUriJpegInput() throws IOException {
+        BufferedImage img = new BufferedImage(80, 60, BufferedImage.TYPE_INT_RGB);
+        Path jpgInput = tempDir.resolve("photo.jpg");
+        ImageIO.write(img, "jpeg", jpgInput.toFile());
+        Path output = tempDir.resolve("uri_jpg_out.jpg");
+
+        ImageEditor.builder()
+                .resize(40, 30)
+                .build()
+                .process(jpgInput.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(40, result.getWidth());
+        assertEquals(30, result.getHeight());
+    }
+
+    @Test
+    void processFromUriGifInput() throws IOException {
+        BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        Path gifInput = tempDir.resolve("anim.gif");
+        ImageIO.write(img, "gif", gifInput.toFile());
+        Path output = tempDir.resolve("uri_gif_out.gif");
+
+        ImageEditor.builder()
+                .resize(25, 25)
+                .build()
+                .process(gifInput.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(25, result.getWidth());
+        assertEquals(25, result.getHeight());
+    }
+
+    @Test
+    void processFromUriBmpInput() throws IOException {
+        BufferedImage img = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
+        Path bmpInput = tempDir.resolve("image.bmp");
+        ImageIO.write(img, "bmp", bmpInput.toFile());
+        Path output = tempDir.resolve("uri_bmp_out.bmp");
+
+        ImageEditor.builder().build().process(bmpInput.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(40, result.getWidth());
+        assertEquals(30, result.getHeight());
+    }
+
+    @Test
+    void processFromUriChainedOperations() throws IOException {
+        Path input = createTestImage(200, 160, "png");
+        Path output = tempDir.resolve("uri_chained.png");
+
+        ImageEditor.builder()
+                .resize(100, 80)
+                .resize(50, 40)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+        assertEquals(40, result.getHeight());
+    }
+
+    @Test
+    void processFromUriWithCropAndResize() throws IOException {
+        Path input = createTestImage(200, 200, "png");
+        Path output = tempDir.resolve("uri_crop_resize.png");
+
+        ImageEditor.builder()
+                .crop(10, 10, 100, 80)
+                .resize(50, 40)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+        assertEquals(40, result.getHeight());
+    }
+
+    @Test
+    void processFromUriWithStripMetadata() throws IOException {
+        Path input = createTestImage(60, 60, "png");
+        Path output = tempDir.resolve("uri_stripped.png");
+
+        ImageEditor.builder()
+                .stripMetadata()
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(60, result.getWidth());
+    }
+
+    @Test
+    void processFromUriDetectsFormatFromBytes() throws IOException {
+        // Create a PNG file but give it no recognizable extension
+        BufferedImage img = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
+        Path pngNoExt = tempDir.resolve("image.dat");
+        ImageIO.write(img, "png", pngNoExt.toFile());
+        Path output = tempDir.resolve("uri_detected.png");
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.PNG)
+                .build()
+                .process(pngNoExt.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(40, result.getWidth());
+        assertEquals(30, result.getHeight());
+    }
+
+    @Test
+    void processFromUriNoExtensionFallsBackToMagicBytes() throws IOException {
+        // File with no extension at all
+        BufferedImage img = new BufferedImage(30, 20, BufferedImage.TYPE_INT_RGB);
+        Path noExt = tempDir.resolve("imagefile");
+        ImageIO.write(img, "png", noExt.toFile());
+        Path output = tempDir.resolve("uri_noext_out.png");
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.PNG)
+                .build()
+                .process(noExt.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(30, result.getWidth());
+        assertEquals(20, result.getHeight());
+    }
+
+    @Test
+    void processFromUriEditorReusable() throws IOException {
+        ImageEditor editor = ImageEditor.builder()
+                .resize(25, 25)
+                .build();
+
+        Path input1 = createTestImage(100, 100, "png");
+        Path output1 = tempDir.resolve("uri_reuse1.png");
+        editor.process(input1.toUri(), output1);
+
+        Path input2 = createTestImage(80, 60, "png");
+        Path output2 = tempDir.resolve("uri_reuse2.png");
+        editor.process(input2.toUri(), output2);
+
+        assertEquals(25, ImageIO.read(output1.toFile()).getWidth());
+        assertEquals(25, ImageIO.read(output2.toFile()).getWidth());
+    }
+
+    @Test
+    void processFromUriOutputFormatOverridesDetected() throws IOException {
+        // Input is PNG, output forced to JPEG
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("uri_forced.jpeg");
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.JPEG)
+                .build()
+                .process(input.toUri(), output);
+
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0xFF, bytes[0]);
+        assertEquals((byte) 0xD8, bytes[1]);
+    }
+
+    @Test
+    void processFromUriPreservesInputFormatWhenNoOutputFormat() throws IOException {
+        Path input = createTestImage(50, 50, "png");
+        Path output = tempDir.resolve("uri_preserve.dat");
+
+        ImageEditor.builder().build().process(input.toUri(), output);
+
+        // Output should be PNG despite .dat extension, since no outputFormat was set
+        // and input format (detected from URI extension) is PNG
+        byte[] bytes = Files.readAllBytes(output);
+        assertEquals((byte) 0x89, bytes[0]);
+        assertEquals((byte) 0x50, bytes[1]);
+        assertEquals((byte) 0x4E, bytes[2]);
+        assertEquals((byte) 0x47, bytes[3]);
+    }
+
+    @Test
+    void processFromUriWithFitOperation() throws IOException {
+        Path input = createTestImage(200, 100, "png");
+        Path output = tempDir.resolve("uri_fit.png");
+
+        ImageEditor.builder()
+                .fit(80, 80)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(80, result.getWidth());
+        assertEquals(40, result.getHeight());
+    }
+
+    @Test
+    void processFromUriWithCoverOperation() throws IOException {
+        Path input = createTestImage(200, 100, "png");
+        Path output = tempDir.resolve("uri_cover.png");
+
+        ImageEditor.builder()
+                .cover(80, 80)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(80, result.getWidth());
+        assertEquals(80, result.getHeight());
+    }
+
+    @Test
+    void processFromUriWithScaleDownOperation() throws IOException {
+        Path input = createTestImage(200, 100, "png");
+        Path output = tempDir.resolve("uri_scaledown.png");
+
+        ImageEditor.builder()
+                .scaleDown(80, 80)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(80, result.getWidth());
+        assertEquals(40, result.getHeight());
+    }
+
+    @Test
+    void processFromUriScaleDownNoOpWhenSmall() throws IOException {
+        Path input = createTestImage(30, 20, "png");
+        Path output = tempDir.resolve("uri_scaledown_noop.png");
+
+        ImageEditor.builder()
+                .scaleDown(100, 100)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(30, result.getWidth());
+        assertEquals(20, result.getHeight());
+    }
+
+    @Test
+    void processFromUriGarbageContentThrows() throws IOException {
+        // File has .png extension but contains garbage bytes
+        Path garbage = tempDir.resolve("bad.png");
+        Files.write(garbage, new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08});
+        Path output = tempDir.resolve("uri_garbage_out.png");
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().process(garbage.toUri(), output));
+    }
+
+    @Test
+    void processFromUriEmptyFileThrows() throws IOException {
+        Path empty = tempDir.resolve("empty.png");
+        Files.write(empty, new byte[0]);
+        Path output = tempDir.resolve("uri_empty_out.png");
+
+        assertThrows(com.imageeditor.exception.ImageEditorException.class, () ->
+                ImageEditor.builder().build().process(empty.toUri(), output));
+    }
+
+    @Test
+    void processFromUriTransparentPngToJpeg() throws IOException {
+        // PNG with alpha channel converted to JPEG (should flatten alpha)
+        BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(255, 0, 0, 128));
+        g.fillRect(0, 0, 50, 50);
+        g.dispose();
+
+        Path input = tempDir.resolve("transparent.png");
+        ImageIO.write(img, "png", input.toFile());
+        Path output = tempDir.resolve("uri_alpha_to_jpg.jpg");
+
+        ImageEditor.builder()
+                .outputFormat(ImageFormat.JPEG)
+                .build()
+                .process(input.toUri(), output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(50, result.getWidth());
+        assertFalse(result.getColorModel().hasAlpha());
     }
 
     // --- Helpers ---

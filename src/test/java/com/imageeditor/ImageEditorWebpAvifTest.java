@@ -29,7 +29,7 @@ class ImageEditorWebpAvifTest {
     @BeforeAll
     static void checkTools() {
         webpAvailable = CliToolRunner.isToolAvailable("cwebp") && CliToolRunner.isToolAvailable("dwebp");
-        avifAvailable = CliToolRunner.isToolAvailable("heif-enc") && CliToolRunner.isToolAvailable("heif-dec");
+        avifAvailable = CliToolRunner.isToolAvailable("heif-enc") && CliToolRunner.resolveHeifDecoder() != null;
         heifInfoAvailable = CliToolRunner.isToolAvailable("heif-info");
     }
 
