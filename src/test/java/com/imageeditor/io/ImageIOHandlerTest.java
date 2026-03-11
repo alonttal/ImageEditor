@@ -647,6 +647,122 @@ class ImageIOHandlerTest {
         assertFalse(result.getColorModel().hasAlpha());
     }
 
+    // --- Mislabeled file tests (magic bytes override extension) ---
+
+    @Test
+    void readPngLabeledAsWebp() throws IOException {
+        Path png = createTestImage(40, 30, "png");
+        Path mislabeled = tempDir.resolve("actually-png.webp");
+        Files.move(png, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readJpegLabeledAsWebp() throws IOException {
+        Path jpg = createTestImage(40, 30, "jpeg");
+        Path mislabeled = tempDir.resolve("actually-jpeg.webp");
+        Files.move(jpg, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readPngLabeledAsJpg() throws IOException {
+        Path png = createTestImage(40, 30, "png");
+        Path mislabeled = tempDir.resolve("actually-png.jpg");
+        Files.move(png, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readJpegLabeledAsPng() throws IOException {
+        Path jpg = createTestImage(40, 30, "jpeg");
+        Path mislabeled = tempDir.resolve("actually-jpeg.png");
+        Files.move(jpg, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readBmpLabeledAsWebp() throws IOException {
+        Path bmp = tempDir.resolve("test.bmp");
+        BufferedImage img = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "bmp", bmp.toFile());
+        Path mislabeled = tempDir.resolve("actually-bmp.webp");
+        Files.move(bmp, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readGifLabeledAsJpg() throws IOException {
+        Path gif = tempDir.resolve("test.gif");
+        BufferedImage img = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "gif", gif.toFile());
+        Path mislabeled = tempDir.resolve("actually-gif.jpg");
+        Files.move(gif, mislabeled);
+
+        BufferedImage image = ImageIOHandler.read(mislabeled);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    // --- No-extension file tests (magic bytes only) ---
+
+    @Test
+    void readPngWithNoExtension() throws IOException {
+        Path png = createTestImage(40, 30, "png");
+        Path noExt = tempDir.resolve("image-no-ext");
+        Files.move(png, noExt);
+
+        BufferedImage image = ImageIOHandler.read(noExt);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readJpegWithNoExtension() throws IOException {
+        Path jpg = createTestImage(40, 30, "jpeg");
+        Path noExt = tempDir.resolve("image-no-ext-jpg");
+        Files.move(jpg, noExt);
+
+        BufferedImage image = ImageIOHandler.read(noExt);
+        assertEquals(40, image.getWidth());
+        assertEquals(30, image.getHeight());
+    }
+
+    @Test
+    void readGarbageWithNoExtensionThrows() throws IOException {
+        Path noExt = tempDir.resolve("garbage-no-ext");
+        Files.write(noExt, new byte[]{0x01, 0x02, 0x03, 0x04, 0x05});
+
+        ImageEditorException ex = assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(noExt));
+        assertTrue(ex.getMessage().contains("Unrecognized image format"),
+                "Expected helpful error message, got: " + ex.getMessage());
+    }
+
+    @Test
+    void readGarbageWithUnsupportedExtensionThrows() throws IOException {
+        Path bad = tempDir.resolve("garbage.xyz");
+        Files.write(bad, new byte[]{0x01, 0x02, 0x03, 0x04, 0x05});
+
+        ImageEditorException ex = assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(bad));
+        assertTrue(ex.getMessage().contains("Unrecognized image format"),
+                "Expected helpful error message, got: " + ex.getMessage());
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

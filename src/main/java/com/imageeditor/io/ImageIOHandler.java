@@ -55,7 +55,12 @@ public class ImageIOHandler {
      * @throws ImageEditorException if the format is unsupported or reading fails
      */
     public static BufferedImage read(Path path) {
-        ImageFormat format = getFormat(path.getFileName().toString());
+        ImageFormat format = FormatDetector.detectFormat(path);
+        if (format == null) {
+            throw new ImageEditorException(
+                    "Unrecognized image format: " + path.getFileName()
+                    + " (not a known image type and no supported file extension)");
+        }
 
         try {
             if (format.isStandard()) {
