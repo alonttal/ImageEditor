@@ -23,6 +23,7 @@ public class CliToolRunner {
             ImageFormat.AVIF, List.of("heif-enc")
     );
     private static final long TIMEOUT_SECONDS = 30;
+    private static final int MAX_OUTPUT_BYTES = 64 * 1024; // 64 KB
 
     private static volatile Path toolDirectory;
 
@@ -121,7 +122,11 @@ public class CliToolRunner {
                     .toLowerCase().contains("win") ? "where" : "which";
             Process p = new ProcessBuilder(lookupCommand, tool)
                     .redirectErrorStream(true).start();
-            return p.waitFor(5, TimeUnit.SECONDS) && p.exitValue() == 0;
+            try {
+                return p.waitFor(5, TimeUnit.SECONDS) && p.exitValue() == 0;
+            } finally {
+                p.destroy();
+            }
         } catch (Exception e) {
             return false;
         }
@@ -140,21 +145,24 @@ public class CliToolRunner {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
             Process process = pb.start();
+            try {
+                byte[] output = process.getInputStream().readNBytes(MAX_OUTPUT_BYTES);
+                boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
-            byte[] output = process.getInputStream().readAllBytes();
-            boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (!finished) {
+                    process.destroyForcibly();
+                    throw new ImageEditorException(
+                            "CLI tool timed out after " + TIMEOUT_SECONDS + "s: " + command[0]);
+                }
 
-            if (!finished) {
-                process.destroyForcibly();
-                throw new ImageEditorException(
-                        "CLI tool timed out after " + TIMEOUT_SECONDS + "s: " + command[0]);
-            }
-
-            if (process.exitValue() != 0) {
-                String errorOutput = new String(output).trim();
-                throw new ImageEditorException(
-                        "CLI tool failed (exit " + process.exitValue() + "): " + command[0]
-                                + (errorOutput.isEmpty() ? "" : "\n" + errorOutput));
+                if (process.exitValue() != 0) {
+                    String errorOutput = new String(output).trim();
+                    throw new ImageEditorException(
+                            "CLI tool failed (exit " + process.exitValue() + "): " + command[0]
+                                    + (errorOutput.isEmpty() ? "" : "\n" + errorOutput));
+                }
+            } finally {
+                process.destroy();
             }
         } catch (IOException e) {
             throw new ImageEditorException("CLI tool not found or failed to execute: " + command[0], e);

@@ -283,12 +283,8 @@ public class ImageEditor {
     }
 
     private boolean isSupportedImage(Path path) {
-        try {
-            ImageFormat format = ImageIOHandler.getFormat(path.getFileName().toString());
-            return ImageIOHandler.isFormatSupported(format);
-        } catch (ImageEditorException e) {
-            return false;
-        }
+        ImageFormat format = ImageIOHandler.detectFormat(path);
+        return format != null && ImageIOHandler.isFormatSupported(format);
     }
 
     /**

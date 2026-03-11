@@ -885,6 +885,64 @@ class ImageEditorTest {
         assertFalse(result.getColorModel().hasAlpha());
     }
 
+    // --- processDirectory with mislabeled/extensionless files ---
+
+    @Test
+    void processDirectoryIncludesMislabeledFiles() throws IOException {
+        Path inputDir = tempDir.resolve("mislabeled_dir");
+        Files.createDirectories(inputDir);
+
+        // Create a PNG file but name it .webp
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", inputDir.resolve("actually-png.webp").toFile());
+        // Create a normal PNG
+        ImageIO.write(img, "png", inputDir.resolve("normal.png").toFile());
+
+        Path outputDir = tempDir.resolve("mislabeled_out");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(2, stream.count(), "Both files should be processed via magic bytes detection");
+        }
+    }
+
+    @Test
+    void processDirectorySkipsNonImageFiles() throws IOException {
+        Path inputDir = tempDir.resolve("non_image_dir");
+        Files.createDirectories(inputDir);
+
+        // Create a real image
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", inputDir.resolve("real.png").toFile());
+        // Create a non-image file
+        Files.write(inputDir.resolve("readme.txt"), "not an image".getBytes());
+
+        Path outputDir = tempDir.resolve("non_image_out");
+        ImageEditor.builder().resize(50, 50).build().processDirectory(inputDir, outputDir);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(1, stream.count(), "Only the real image should be processed");
+        }
+    }
+
+    @Test
+    void processDirectoryIncludesNoExtensionImagesWithOutputFormat() throws IOException {
+        Path inputDir = tempDir.resolve("noext_dir");
+        Files.createDirectories(inputDir);
+
+        // Create a PNG file with no extension
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "png", inputDir.resolve("image-no-ext").toFile());
+
+        Path outputDir = tempDir.resolve("noext_out");
+        ImageEditor.builder().resize(50, 50).outputFormat(ImageFormat.PNG).build()
+                .processDirectory(inputDir, outputDir);
+
+        try (var stream = Files.list(outputDir)) {
+            assertEquals(1, stream.count(), "Extensionless image should be detected via magic bytes");
+        }
+    }
+
     // --- Helpers ---
 
     private Path createTestImage(int width, int height, String format) throws IOException {

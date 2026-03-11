@@ -325,10 +325,13 @@ public class ImageIOHandler {
         }
         BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = rgb.createGraphics();
-        g.setColor(Color.WHITE);
-        g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
-        g.drawImage(image, 0, 0, null);
-        g.dispose();
+        try {
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            g.drawImage(image, 0, 0, null);
+        } finally {
+            g.dispose();
+        }
         return rgb;
     }
 
@@ -387,9 +390,14 @@ public class ImageIOHandler {
         java.awt.image.WritableRaster raster = cm.createCompatibleWritableRaster(w, h);
         BufferedImage img16 = new BufferedImage(cm, raster, false, null);
         Graphics2D g = img16.createGraphics();
-        g.drawImage(image, 0, 0, null);
-        g.dispose();
-        ImageIO.write(img16, "png", path.toFile());
+        try {
+            g.drawImage(image, 0, 0, null);
+        } finally {
+            g.dispose();
+        }
+        if (!ImageIO.write(img16, "png", path.toFile())) {
+            throw new ImageEditorException("No writer found for PNG format");
+        }
     }
 
     private static void writeViaCliFromPng(BufferedImage image, Path outputPath, OutputOptions options,

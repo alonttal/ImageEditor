@@ -23,8 +23,8 @@ public record CoverOperation(int targetWidth, int targetHeight) implements Opera
         double scaleY = (double) targetHeight / image.getHeight();
         double scale = Math.max(scaleX, scaleY);
 
-        int scaledWidth = (int) Math.round(image.getWidth() * scale);
-        int scaledHeight = (int) Math.round(image.getHeight() * scale);
+        int scaledWidth = Math.max(targetWidth, (int) Math.round(image.getWidth() * scale));
+        int scaledHeight = Math.max(targetHeight, (int) Math.round(image.getHeight() * scale));
 
         BufferedImage scaled = ImageScaler.scale(image, scaledWidth, scaledHeight);
 

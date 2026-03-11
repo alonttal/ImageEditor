@@ -29,9 +29,12 @@ class ImageScaler {
     static BufferedImage scale(BufferedImage source, int width, int height) {
         BufferedImage result = new BufferedImage(width, height, safeType(source));
         Graphics2D g = result.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(source, 0, 0, width, height, null);
-        g.dispose();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(source, 0, 0, width, height, null);
+        } finally {
+            g.dispose();
+        }
         return result;
     }
 
@@ -48,8 +51,11 @@ class ImageScaler {
     static BufferedImage copyRegion(BufferedImage source, int x, int y, int width, int height) {
         BufferedImage copy = new BufferedImage(width, height, safeType(source));
         Graphics2D g = copy.createGraphics();
-        g.drawImage(source, 0, 0, width, height, x, y, x + width, y + height, null);
-        g.dispose();
+        try {
+            g.drawImage(source, 0, 0, width, height, x, y, x + width, y + height, null);
+        } finally {
+            g.dispose();
+        }
         return copy;
     }
 
