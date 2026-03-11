@@ -404,7 +404,9 @@ public class ImageIOHandler {
                                            String... commandParts) throws IOException {
         Path tmpPng = Files.createTempFile("imageeditor-", ".png");
         try {
-            ImageIO.write(image, "png", tmpPng.toFile());
+            if (!ImageIO.write(image, "png", tmpPng.toFile())) {
+                throw new ImageEditorException("No writer found for PNG format");
+            }
             // Build command, replacing null placeholder with tmp png path
             ArrayList<String> command = new ArrayList<>();
             for (String part : commandParts) {
