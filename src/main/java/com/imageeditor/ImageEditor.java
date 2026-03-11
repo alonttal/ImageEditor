@@ -84,6 +84,9 @@ public class ImageEditor {
 
         ImageFormat format = outputOptions.outputFormat();
         if (format == null) {
+            format = ImageIOHandler.detectFormat(inputPath);
+        }
+        if (format == null) {
             format = ImageIOHandler.getFormat(inputPath.getFileName().toString());
         }
         ImageIOHandler.write(image, outputPath, format, outputOptions);

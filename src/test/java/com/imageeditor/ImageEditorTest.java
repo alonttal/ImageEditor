@@ -278,6 +278,36 @@ class ImageEditorTest {
                 ImageEditor.builder().build().process(noFile, output));
     }
 
+    @Test
+    void processMislabeledFileWithoutOutputFormat() throws IOException {
+        // A JPEG named .webp — output format should be detected as JPEG from magic bytes
+        BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        Path input = tempDir.resolve("mislabeled.webp");
+        ImageIO.write(img, "jpeg", input.toFile());
+        Path output = tempDir.resolve("result.jpg");
+
+        ImageEditor.builder().resize(25, 25).build().process(input, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(25, result.getWidth());
+        assertEquals(25, result.getHeight());
+    }
+
+    @Test
+    void processNoExtensionFileWithoutOutputFormat() throws IOException {
+        // A PNG with no extension — output format should be detected from magic bytes
+        BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        Path input = tempDir.resolve("no-ext-image");
+        ImageIO.write(img, "png", input.toFile());
+        Path output = tempDir.resolve("result.png");
+
+        ImageEditor.builder().resize(25, 25).build().process(input, output);
+
+        BufferedImage result = ImageIO.read(output.toFile());
+        assertEquals(25, result.getWidth());
+        assertEquals(25, result.getHeight());
+    }
+
     // --- processDirectory() edge cases ---
 
     @Test
