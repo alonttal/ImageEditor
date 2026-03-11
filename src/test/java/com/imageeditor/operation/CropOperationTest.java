@@ -86,4 +86,13 @@ class CropOperationTest {
     void rejectsZeroDimensions() {
         assertThrows(ImageEditorException.class, () -> new CropOperation(0, 0, 0, 50));
     }
+
+    @Test
+    void rejectsOverflowingBounds() {
+        // x + width would overflow int (wraps negative), but should still be rejected
+        BufferedImage input = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        CropOperation op = new CropOperation(1_000_000_000, 0, 2_000_000_000, 50);
+
+        assertThrows(ImageEditorException.class, () -> op.apply(input));
+    }
 }

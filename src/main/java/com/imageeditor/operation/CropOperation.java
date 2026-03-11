@@ -25,7 +25,7 @@ public record CropOperation(int x, int y, int width, int height) implements Oper
 
     @Override
     public BufferedImage apply(BufferedImage image) {
-        if (x + width > image.getWidth() || y + height > image.getHeight()) {
+        if ((long) x + width > image.getWidth() || (long) y + height > image.getHeight()) {
             throw new ImageEditorException(
                     "Crop region (%d,%d %dx%d) exceeds image bounds (%dx%d)"
                             .formatted(x, y, width, height, image.getWidth(), image.getHeight()));
