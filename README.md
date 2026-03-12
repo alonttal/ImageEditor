@@ -64,8 +64,8 @@ heif-dec --version
 Use `ImageIOHandler.isFormatSupported()` to check at runtime whether a format is ready to use. This checks that the required CLI tools are installed and available on the system `PATH`.
 
 ```java
-import com.imageeditor.io.ImageFormat;
-import com.imageeditor.io.ImageIOHandler;
+import io.github.alonttal.imageeditor.io.ImageFormat;
+import io.github.alonttal.imageeditor.io.ImageIOHandler;
 
 // Standard formats — always true
 ImageIOHandler.isFormatSupported(ImageFormat.PNG);   // true
@@ -89,8 +89,8 @@ for (ImageFormat fmt : ImageFormat.values()) {
 ## Usage
 
 ```java
-import com.imageeditor.ImageEditor;
-import com.imageeditor.io.ImageFormat;
+import io.github.alonttal.imageeditor.ImageEditor;
+import io.github.alonttal.imageeditor.io.ImageFormat;
 import java.nio.file.Path;
 
 // Resize an image to exact dimensions
@@ -199,7 +199,7 @@ The `ImageEditor` instance is reusable — you can call `process()` on multiple 
 By default, CLI tools are resolved from the system `PATH`. To use tools from a specific directory:
 
 ```java
-import com.imageeditor.io.ImageIOHandler;
+import io.github.alonttal.imageeditor.io.ImageIOHandler;
 
 ImageIOHandler.setToolDirectory(Path.of("/opt/image-tools/bin"));
 ```
