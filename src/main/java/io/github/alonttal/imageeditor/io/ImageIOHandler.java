@@ -356,6 +356,7 @@ public class ImageIOHandler {
 
             ArrayList<String> command = new ArrayList<>();
             command.add(CliToolRunner.resolveToolPath("heif-enc"));
+            command.add("-A");
             if (options.quality() != null) {
                 int qValue = Math.round(options.quality() * 100);
                 command.add("-q");

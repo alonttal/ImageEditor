@@ -339,6 +339,66 @@ class ImageEditorWebpAvifTest {
     }
 
     @Test
+    void avifWriteWithNonAvifExtension() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // The -A flag tells heif-enc to produce AVIF regardless of the output extension.
+        // Without -A, heif-enc may produce HEIC when the extension is not .avif.
+        BufferedImage img = createGradientImage(100, 80);
+        Path pngInput = tempDir.resolve("non_avif_ext.png");
+        ImageIO.write(img, "png", pngInput.toFile());
+        Path heicOutput = tempDir.resolve("output.heic");
+
+        ImageEditor.builder()
+                .quality(0.5f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, heicOutput);
+
+        assertTrue(Files.exists(heicOutput));
+        assertTrue(Files.size(heicOutput) > 0);
+
+        // Verify the file contains AVIF data (ftyp box with 'avif' brand) despite the .heic extension
+        byte[] header = Files.readAllBytes(heicOutput);
+        assertTrue(header.length >= 12, "File too small to be valid AVIF");
+        // ISOBMFF ftyp box: bytes 4-7 = "ftyp", bytes 8-11 = major brand
+        String ftyp = new String(header, 4, 4);
+        assertEquals("ftyp", ftyp, "Expected ISOBMFF ftyp box");
+        String brand = new String(header, 8, 4);
+        assertTrue(brand.equals("avif") || brand.equals("avis"),
+                "Expected AVIF brand in ftyp box, got: " + brand);
+    }
+
+    @Test
+    void avifWriteWithNoExtension() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // Verify -A flag allows writing AVIF to a path with no file extension
+        BufferedImage img = createGradientImage(100, 80);
+        Path pngInput = tempDir.resolve("no_ext_input.png");
+        ImageIO.write(img, "png", pngInput.toFile());
+        Path noExtOutput = tempDir.resolve("output_no_ext");
+
+        ImageEditor.builder()
+                .quality(0.5f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, noExtOutput);
+
+        assertTrue(Files.exists(noExtOutput));
+        assertTrue(Files.size(noExtOutput) > 0);
+
+        // Verify the output is valid AVIF
+        byte[] header = Files.readAllBytes(noExtOutput);
+        assertTrue(header.length >= 12);
+        String ftyp = new String(header, 4, 4);
+        assertEquals("ftyp", ftyp);
+        String brand = new String(header, 8, 4);
+        assertTrue(brand.equals("avif") || brand.equals("avis"),
+                "Expected AVIF brand, got: " + brand);
+    }
+
+    @Test
     void avifQualityConstant() {
         assertEquals(0.46f, ImageEditor.AVIF_QUALITY);
     }

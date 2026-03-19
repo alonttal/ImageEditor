@@ -105,6 +105,31 @@ class ImageIOHandlerTest {
     }
 
     @Test
+    void writeAvifWithNonAvifExtensionProducesValidAvif() throws IOException, InterruptedException {
+        assumeTrue(CliToolRunner.isToolAvailable("heif-enc"), "heif-enc not installed, skipping");
+        assumeTrue(CliToolRunner.resolveHeifDecoder() != null, "heif-dec/heif-convert not installed, skipping");
+
+        // The -A flag forces AVIF output regardless of file extension.
+        BufferedImage image = createRichTestImage(64, 48);
+        Path heicOutput = tempDir.resolve("forced.heic");
+
+        ImageIOHandler.write(image, heicOutput, ImageFormat.AVIF, OutputOptions.builder()
+                .quality(0.5f)
+                .build());
+
+        assertTrue(Files.exists(heicOutput));
+        assertTrue(Files.size(heicOutput) > 0);
+
+        // Verify ftyp box has AVIF brand
+        byte[] header = Files.readAllBytes(heicOutput);
+        assertTrue(header.length >= 12);
+        assertEquals("ftyp", new String(header, 4, 4));
+        String brand = new String(header, 8, 4);
+        assertTrue(brand.equals("avif") || brand.equals("avis"),
+                "Expected AVIF brand, got: " + brand);
+    }
+
+    @Test
     void unsupportedFormatThrows() {
         Path file = tempDir.resolve("image.xyz");
         assertThrows(ImageEditorException.class, () -> ImageIOHandler.read(file));
