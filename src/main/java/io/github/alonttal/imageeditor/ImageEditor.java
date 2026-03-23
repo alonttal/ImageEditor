@@ -79,7 +79,11 @@ public class ImageEditor {
         BufferedImage image = ImageIOHandler.read(inputPath);
 
         for (Operation op : operations) {
+            BufferedImage previous = image;
             image = op.apply(image);
+            if (image != previous) {
+                previous.flush();
+            }
         }
 
         ImageFormat format = outputOptions.outputFormat();
@@ -118,7 +122,11 @@ public class ImageEditor {
         BufferedImage image = ImageIOHandler.read(buffered, detectedFormat);
 
         for (Operation op : operations) {
+            BufferedImage previous = image;
             image = op.apply(image);
+            if (image != previous) {
+                previous.flush();
+            }
         }
 
         ImageFormat format = outputOptions.outputFormat();
@@ -174,7 +182,11 @@ public class ImageEditor {
             BufferedImage image = ImageIOHandler.read(buffered, detectedFormat);
 
             for (Operation op : operations) {
+                BufferedImage previous = image;
                 image = op.apply(image);
+                if (image != previous) {
+                    previous.flush();
+                }
             }
 
             ImageFormat format = outputOptions.outputFormat();

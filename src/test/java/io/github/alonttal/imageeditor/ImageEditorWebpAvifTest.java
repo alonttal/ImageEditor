@@ -4,6 +4,7 @@ import io.github.alonttal.imageeditor.io.CliToolRunner;
 import io.github.alonttal.imageeditor.io.ImageFormat;
 import io.github.alonttal.imageeditor.io.ImageIOHandler;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -396,6 +397,67 @@ class ImageEditorWebpAvifTest {
         String brand = new String(header, 8, 4);
         assertTrue(brand.equals("avif") || brand.equals("avis"),
                 "Expected AVIF brand, got: " + brand);
+    }
+
+    @Tag("slow")
+    @Test
+    void avifConversionDoesNotLeakMemory() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        int iterations = 2000;
+        Path pngInput = tempDir.resolve("leak_test.png");
+        ImageIO.write(createGradientImage(400, 300), "png", pngInput.toFile());
+
+        ImageEditor editor = ImageEditor.builder()
+                .resize(200, 150)
+                .quality(0.5f)
+                .outputFormat(ImageFormat.AVIF)
+                .build();
+
+        // Warm up and establish baseline
+        for (int i = 0; i < 10; i++) {
+            Path out = tempDir.resolve("warmup_" + i + ".avif");
+            editor.process(pngInput, out);
+            Files.delete(out);
+        }
+        System.gc();
+        Thread.sleep(200);
+        long baselineMemory = usedMemory();
+
+        // Run many conversions, checking memory periodically
+        long peakMemory = baselineMemory;
+        for (int i = 0; i < iterations; i++) {
+            Path out = tempDir.resolve("leak_" + i + ".avif");
+            editor.process(pngInput, out);
+            Files.delete(out);
+
+            if (i % 200 == 199) {
+                System.gc();
+                Thread.sleep(100);
+                long currentMemory = usedMemory();
+                peakMemory = Math.max(peakMemory, currentMemory);
+            }
+        }
+
+        System.gc();
+        Thread.sleep(200);
+        long finalMemory = usedMemory();
+
+        // Memory growth should stay within 30 MB of baseline.
+        // Without the leak fixes, hundreds of unclosed streams and unflushed
+        // BufferedImages would push this well beyond the threshold.
+        long growthBytes = finalMemory - baselineMemory;
+        long thresholdBytes = 30L * 1024 * 1024;
+        assertTrue(growthBytes < thresholdBytes,
+                "Memory grew by " + (growthBytes / (1024 * 1024)) + " MB after " + iterations
+                        + " AVIF conversions (baseline=" + (baselineMemory / (1024 * 1024))
+                        + " MB, final=" + (finalMemory / (1024 * 1024))
+                        + " MB, threshold=" + (thresholdBytes / (1024 * 1024)) + " MB)");
+    }
+
+    private static long usedMemory() {
+        Runtime rt = Runtime.getRuntime();
+        return rt.totalMemory() - rt.freeMemory();
     }
 
     @Test

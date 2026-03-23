@@ -396,8 +396,12 @@ public class ImageIOHandler {
         } finally {
             g.dispose();
         }
-        if (!ImageIO.write(img16, "png", path.toFile())) {
-            throw new ImageEditorException("No writer found for PNG format");
+        try {
+            if (!ImageIO.write(img16, "png", path.toFile())) {
+                throw new ImageEditorException("No writer found for PNG format");
+            }
+        } finally {
+            img16.flush();
         }
     }
 

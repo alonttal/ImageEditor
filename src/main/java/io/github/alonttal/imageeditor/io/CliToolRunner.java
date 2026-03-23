@@ -3,6 +3,7 @@ package io.github.alonttal.imageeditor.io;
 import io.github.alonttal.imageeditor.exception.ImageEditorException;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -146,7 +147,10 @@ public class CliToolRunner {
             pb.redirectErrorStream(true);
             Process process = pb.start();
             try {
-                byte[] output = process.getInputStream().readNBytes(MAX_OUTPUT_BYTES);
+                byte[] output;
+                try (InputStream is = process.getInputStream()) {
+                    output = is.readNBytes(MAX_OUTPUT_BYTES);
+                }
                 boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
                 if (!finished) {
