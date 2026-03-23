@@ -77,23 +77,26 @@ public class ImageEditor {
      */
     public void process(Path inputPath, Path outputPath) {
         BufferedImage image = ImageIOHandler.read(inputPath);
-
-        for (Operation op : operations) {
-            BufferedImage previous = image;
-            image = op.apply(image);
-            if (image != previous) {
-                previous.flush();
+        try {
+            for (Operation op : operations) {
+                BufferedImage previous = image;
+                image = op.apply(image);
+                if (image != previous) {
+                    previous.flush();
+                }
             }
-        }
 
-        ImageFormat format = outputOptions.outputFormat();
-        if (format == null) {
-            format = ImageIOHandler.detectFormat(inputPath);
+            ImageFormat format = outputOptions.outputFormat();
+            if (format == null) {
+                format = ImageIOHandler.detectFormat(inputPath);
+            }
+            if (format == null) {
+                format = ImageIOHandler.getFormat(inputPath.getFileName().toString());
+            }
+            ImageIOHandler.write(image, outputPath, format, outputOptions);
+        } finally {
+            image.flush();
         }
-        if (format == null) {
-            format = ImageIOHandler.getFormat(inputPath.getFileName().toString());
-        }
-        ImageIOHandler.write(image, outputPath, format, outputOptions);
     }
 
     /**
@@ -120,20 +123,23 @@ public class ImageEditor {
         }
 
         BufferedImage image = ImageIOHandler.read(buffered, detectedFormat);
-
-        for (Operation op : operations) {
-            BufferedImage previous = image;
-            image = op.apply(image);
-            if (image != previous) {
-                previous.flush();
+        try {
+            for (Operation op : operations) {
+                BufferedImage previous = image;
+                image = op.apply(image);
+                if (image != previous) {
+                    previous.flush();
+                }
             }
-        }
 
-        ImageFormat format = outputOptions.outputFormat();
-        if (format == null) {
-            format = detectedFormat;
+            ImageFormat format = outputOptions.outputFormat();
+            if (format == null) {
+                format = detectedFormat;
+            }
+            ImageIOHandler.write(image, output, format, outputOptions);
+        } finally {
+            image.flush();
         }
-        ImageIOHandler.write(image, output, format, outputOptions);
     }
 
     /**
@@ -180,20 +186,23 @@ public class ImageEditor {
             }
 
             BufferedImage image = ImageIOHandler.read(buffered, detectedFormat);
-
-            for (Operation op : operations) {
-                BufferedImage previous = image;
-                image = op.apply(image);
-                if (image != previous) {
-                    previous.flush();
+            try {
+                for (Operation op : operations) {
+                    BufferedImage previous = image;
+                    image = op.apply(image);
+                    if (image != previous) {
+                        previous.flush();
+                    }
                 }
-            }
 
-            ImageFormat format = outputOptions.outputFormat();
-            if (format == null) {
-                format = detectedFormat;
+                ImageFormat format = outputOptions.outputFormat();
+                if (format == null) {
+                    format = detectedFormat;
+                }
+                ImageIOHandler.write(image, outputPath, format, outputOptions);
+            } finally {
+                image.flush();
             }
-            ImageIOHandler.write(image, outputPath, format, outputOptions);
         } catch (ImageEditorException e) {
             throw e;
         } catch (Exception e) {
