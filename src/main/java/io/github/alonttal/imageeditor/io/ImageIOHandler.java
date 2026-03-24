@@ -378,31 +378,118 @@ public class ImageIOHandler {
         }
     }
 
+    /**
+     * Writes the image as a 16-bit PNG, streaming row by row to avoid
+     * allocating a full 16-bit BufferedImage in memory. Only one scanline
+     * buffer is held at a time, so memory overhead is O(width) instead of
+     * O(width * height).
+     */
     private static void write16BitPng(BufferedImage image, Path path) throws IOException {
         int w = image.getWidth();
         int h = image.getHeight();
         boolean hasAlpha = image.getColorModel().hasAlpha();
+        int channels = hasAlpha ? 4 : 3;
+        int colorType = hasAlpha ? 6 : 2; // 6 = RGBA, 2 = RGB
 
-        java.awt.color.ColorSpace srgb = java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB);
-        java.awt.image.ColorModel cm = new java.awt.image.ComponentColorModel(
-                srgb, hasAlpha, false,
-                hasAlpha ? Transparency.TRANSLUCENT : Transparency.OPAQUE,
-                java.awt.image.DataBuffer.TYPE_USHORT);
-        java.awt.image.WritableRaster raster = cm.createCompatibleWritableRaster(w, h);
-        BufferedImage img16 = new BufferedImage(cm, raster, false, null);
-        Graphics2D g = img16.createGraphics();
-        try {
-            g.drawImage(image, 0, 0, null);
-        } finally {
-            g.dispose();
-        }
-        try {
-            if (!ImageIO.write(img16, "png", path.toFile())) {
-                throw new ImageEditorException("No writer found for PNG format");
+        try (OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(path))) {
+            // PNG signature
+            fileOut.write(new byte[]{(byte) 137, 80, 78, 71, 13, 10, 26, 10});
+
+            // IHDR chunk
+            byte[] ihdr = new byte[13];
+            writeInt(ihdr, 0, w);
+            writeInt(ihdr, 4, h);
+            ihdr[8] = 16; // bit depth
+            ihdr[9] = (byte) colorType;
+            ihdr[10] = 0; // compression method
+            ihdr[11] = 0; // filter method
+            ihdr[12] = 0; // interlace method
+            writeChunk(fileOut, "IHDR", ihdr);
+
+            // IDAT chunk(s) — compressed scanlines
+            // Filter byte (0 = None) + 2 bytes per channel per pixel
+            int scanlineBytes = 1 + w * channels * 2;
+            byte[] scanline = new byte[scanlineBytes];
+            // Batch row of ARGB pixels to avoid per-pixel getRGB overhead
+            int[] rowPixels = new int[w];
+
+            java.util.zip.Deflater deflater = new java.util.zip.Deflater();
+            try {
+                ByteArrayOutputStream idatBuffer = new ByteArrayOutputStream();
+                java.util.zip.DeflaterOutputStream deflaterOut =
+                        new java.util.zip.DeflaterOutputStream(idatBuffer, deflater);
+
+                for (int y = 0; y < h; y++) {
+                    image.getRGB(0, y, w, 1, rowPixels, 0, w);
+                    scanline[0] = 0; // filter: None
+                    int pos = 1;
+                    for (int x = 0; x < w; x++) {
+                        int argb = rowPixels[x];
+                        int r = (argb >> 16) & 0xFF;
+                        int g = (argb >> 8) & 0xFF;
+                        int b = argb & 0xFF;
+                        // Scale 8-bit to 16-bit: v * 257 maps 0->0, 255->65535
+                        writeShort(scanline, pos, r * 257);
+                        pos += 2;
+                        writeShort(scanline, pos, g * 257);
+                        pos += 2;
+                        writeShort(scanline, pos, b * 257);
+                        pos += 2;
+                        if (hasAlpha) {
+                            int a = (argb >> 24) & 0xFF;
+                            writeShort(scanline, pos, a * 257);
+                            pos += 2;
+                        }
+                    }
+                    deflaterOut.write(scanline);
+
+                    // Flush IDAT chunks periodically to avoid large buffers
+                    if (idatBuffer.size() > 65536) {
+                        deflaterOut.flush();
+                        writeChunk(fileOut, "IDAT", idatBuffer.toByteArray());
+                        idatBuffer.reset();
+                    }
+                }
+
+                deflaterOut.finish();
+                if (idatBuffer.size() > 0) {
+                    writeChunk(fileOut, "IDAT", idatBuffer.toByteArray());
+                }
+            } finally {
+                deflater.end();
             }
-        } finally {
-            img16.flush();
+
+            // IEND chunk
+            writeChunk(fileOut, "IEND", new byte[0]);
         }
+    }
+
+    private static void writeChunk(OutputStream out, String type, byte[] data) throws IOException {
+        byte[] typeBytes = type.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        byte[] lengthBytes = new byte[4];
+        writeInt(lengthBytes, 0, data.length);
+        out.write(lengthBytes);
+        out.write(typeBytes);
+        out.write(data);
+
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(typeBytes);
+        crc.update(data);
+        byte[] crcBytes = new byte[4];
+        writeInt(crcBytes, 0, (int) crc.getValue());
+        out.write(crcBytes);
+    }
+
+    private static void writeInt(byte[] buf, int offset, int value) {
+        buf[offset] = (byte) (value >> 24);
+        buf[offset + 1] = (byte) (value >> 16);
+        buf[offset + 2] = (byte) (value >> 8);
+        buf[offset + 3] = (byte) value;
+    }
+
+    private static void writeShort(byte[] buf, int offset, int value) {
+        buf[offset] = (byte) (value >> 8);
+        buf[offset + 1] = (byte) value;
     }
 
     private static void writeViaCliFromPng(BufferedImage image, Path outputPath, OutputOptions options,

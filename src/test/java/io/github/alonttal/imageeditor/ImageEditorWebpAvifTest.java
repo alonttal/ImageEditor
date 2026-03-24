@@ -399,6 +399,102 @@ class ImageEditorWebpAvifTest {
                 "Expected AVIF brand, got: " + brand);
     }
 
+    @Test
+    void avifConversionPeakMemoryIsLow() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // A 1920x1080 image occupies ~8 MB uncompressed (W*H*4).
+        // The streaming 16-bit PNG writer should NOT allocate a full 16-bit
+        // copy in memory, so the peak delta during AVIF conversion should
+        // stay well below the old W*H*12 (~24 MB) cost.
+        int w = 1920, h = 1080;
+        Path pngInput = tempDir.resolve("peakmem.png");
+        ImageIO.write(createGradientImage(w, h), "png", pngInput.toFile());
+
+        ImageEditor editor = ImageEditor.builder()
+                .quality(0.5f)
+                .outputFormat(ImageFormat.AVIF)
+                .build();
+
+        // Warmup
+        Path warmup = tempDir.resolve("warmup_peak.avif");
+        editor.process(pngInput, warmup);
+        Files.delete(warmup);
+
+        // Measure peak memory during conversion
+        System.gc();
+        Thread.sleep(200);
+        long before = usedMemory();
+        long[] peak = {before};
+
+        Thread monitor = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                long mem = usedMemory();
+                synchronized (peak) { if (mem > peak[0]) peak[0] = mem; }
+                try { Thread.sleep(1); } catch (InterruptedException e) { break; }
+            }
+        });
+        monitor.setDaemon(true);
+        monitor.start();
+
+        Path avifOutput = tempDir.resolve("peakmem.avif");
+        editor.process(pngInput, avifOutput);
+
+        monitor.interrupt();
+        monitor.join(500);
+
+        long delta;
+        synchronized (peak) { delta = peak[0] - before; }
+
+        // The old in-memory approach would use ~60-100 MB for 1920x1080.
+        // The streaming approach should stay under 30 MB (source image + buffers).
+        long thresholdBytes = 30L * 1024 * 1024;
+        assertTrue(delta < thresholdBytes,
+                "AVIF conversion of " + w + "x" + h + " used " + (delta / (1024 * 1024))
+                        + " MB peak delta, expected < " + (thresholdBytes / (1024 * 1024)) + " MB");
+    }
+
+    @Test
+    void avifStreamingProducesSameQualityAsStandard() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // Verify the streaming 16-bit PNG writer produces valid AVIF output
+        // that decodes back to pixels matching the original within AVIF
+        // lossy tolerance.
+        BufferedImage original = createGradientImage(200, 150);
+        Path pngInput = tempDir.resolve("quality_check.png");
+        ImageIO.write(original, "png", pngInput.toFile());
+        Path avifOutput = tempDir.resolve("quality_check.avif");
+
+        ImageEditor.builder()
+                .quality(0.9f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, avifOutput);
+
+        BufferedImage decoded = ImageIOHandler.read(avifOutput);
+        assertEquals(original.getWidth(), decoded.getWidth());
+        assertEquals(original.getHeight(), decoded.getHeight());
+
+        // Compare pixels — at q=0.9 the PSNR should be high (> 35 dB)
+        long sumSquaredError = 0;
+        int count = 0;
+        for (int y = 0; y < original.getHeight(); y++) {
+            for (int x = 0; x < original.getWidth(); x++) {
+                int rgbA = original.getRGB(x, y);
+                int rgbB = decoded.getRGB(x, y);
+                int dr = ((rgbA >> 16) & 0xFF) - ((rgbB >> 16) & 0xFF);
+                int dg = ((rgbA >> 8) & 0xFF) - ((rgbB >> 8) & 0xFF);
+                int db = (rgbA & 0xFF) - (rgbB & 0xFF);
+                sumSquaredError += dr * dr + dg * dg + db * db;
+                count += 3;
+            }
+        }
+        double mse = (double) sumSquaredError / count;
+        double psnr = mse > 0 ? 10 * Math.log10(255.0 * 255.0 / mse) : 99;
+        assertTrue(psnr > 35, "PSNR too low: " + psnr + " dB, expected > 35 dB");
+    }
+
     @Tag("slow")
     @Test
     void avifConversionDoesNotLeakMemory() throws Exception {
