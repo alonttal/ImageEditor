@@ -557,6 +557,115 @@ class ImageEditorWebpAvifTest {
     }
 
     @Test
+    void avifGrayscalePreservesPixelValues() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // Create a grayscale image with a wide tonal range.
+        // A prior bug applied double-gamma correction: getRGB() converts
+        // grayscale ICC values to sRGB (e.g. raw 119 → sRGB 182), then the
+        // sRGB PNG chunk told heif-enc to apply gamma again, washing out the image.
+        int w = 200, h = 150;
+        BufferedImage gray = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int v = (x * 255) / w;
+                gray.getRaster().setSample(x, y, 0, v);
+            }
+        }
+        Path pngInput = tempDir.resolve("grayscale_test.png");
+        ImageIO.write(gray, "png", pngInput.toFile());
+        Path avifOutput = tempDir.resolve("grayscale_test.avif");
+
+        ImageEditor.builder()
+                .quality(0.9f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, avifOutput);
+
+        BufferedImage decoded = ImageIOHandler.read(avifOutput);
+        assertEquals(w, decoded.getWidth());
+        assertEquals(h, decoded.getHeight());
+
+        // Compare against original raw raster values (not getRGB() which
+        // applies ICC gamma conversion on grayscale images).
+        long sumSquaredError = 0;
+        int count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int original = gray.getRaster().getSample(x, y, 0);
+                int rgbDecoded = decoded.getRGB(x, y);
+                int rDecoded = (rgbDecoded >> 16) & 0xFF;
+                int diff = original - rDecoded;
+                sumSquaredError += diff * diff;
+                count++;
+            }
+        }
+        double mse = (double) sumSquaredError / count;
+        double psnr = mse > 0 ? 10 * Math.log10(255.0 * 255.0 / mse) : 99;
+        // With double-gamma bug, PSNR drops below 20 dB.
+        // Correct conversion should yield > 35 dB at q=0.9.
+        assertTrue(psnr > 35,
+                "Grayscale AVIF PSNR too low: " + psnr + " dB, expected > 35 dB"
+                        + " (possible double-gamma correction)");
+    }
+
+    @Test
+    void avifColorImagePreservesSrgb() throws Exception {
+        assumeTrue(avifAvailable, "AVIF tools not installed, skipping");
+
+        // Create a color image with saturated primaries and subtle gradients.
+        // Without sRGB/gAMA/cHRM chunks in the intermediate PNG, heif-enc
+        // may misinterpret the color space, shifting colors.
+        int w = 200, h = 150;
+        BufferedImage color = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int r = (x * 255) / w;
+                int g = (y * 255) / h;
+                int b = 128;
+                color.setRGB(x, y, (r << 16) | (g << 8) | b);
+            }
+        }
+        Path pngInput = tempDir.resolve("color_srgb_test.png");
+        ImageIO.write(color, "png", pngInput.toFile());
+        Path avifOutput = tempDir.resolve("color_srgb_test.avif");
+
+        ImageEditor.builder()
+                .quality(0.9f)
+                .outputFormat(ImageFormat.AVIF)
+                .build()
+                .process(pngInput, avifOutput);
+
+        BufferedImage decoded = ImageIOHandler.read(avifOutput);
+        assertEquals(w, decoded.getWidth());
+        assertEquals(h, decoded.getHeight());
+
+        // Check PSNR per channel to catch color space shifts
+        long[] channelError = new long[3];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int rgbA = color.getRGB(x, y);
+                int rgbB = decoded.getRGB(x, y);
+                int dr = ((rgbA >> 16) & 0xFF) - ((rgbB >> 16) & 0xFF);
+                int dg = ((rgbA >> 8) & 0xFF) - ((rgbB >> 8) & 0xFF);
+                int db = (rgbA & 0xFF) - (rgbB & 0xFF);
+                channelError[0] += dr * dr;
+                channelError[1] += dg * dg;
+                channelError[2] += db * db;
+            }
+        }
+        int pixels = w * h;
+        String[] names = {"Red", "Green", "Blue"};
+        for (int c = 0; c < 3; c++) {
+            double mse = (double) channelError[c] / pixels;
+            double psnr = mse > 0 ? 10 * Math.log10(255.0 * 255.0 / mse) : 99;
+            assertTrue(psnr > 35,
+                    names[c] + " channel PSNR too low: " + psnr + " dB, expected > 35 dB"
+                            + " (possible missing sRGB color space metadata)");
+        }
+    }
+
+    @Test
     void avifQualityConstant() {
         assertEquals(0.46f, ImageEditor.AVIF_QUALITY);
     }

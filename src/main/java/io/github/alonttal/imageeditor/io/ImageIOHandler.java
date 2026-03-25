@@ -388,6 +388,8 @@ public class ImageIOHandler {
         int w = image.getWidth();
         int h = image.getHeight();
         boolean hasAlpha = image.getColorModel().hasAlpha();
+        boolean isGrayscale = image.getColorModel().getColorSpace().getType()
+                == java.awt.color.ColorSpace.TYPE_GRAY;
         int channels = hasAlpha ? 4 : 3;
         int colorType = hasAlpha ? 6 : 2; // 6 = RGBA, 2 = RGB
 
@@ -406,12 +408,35 @@ public class ImageIOHandler {
             ihdr[12] = 0; // interlace method
             writeChunk(fileOut, "IHDR", ihdr);
 
+            // Color space chunks — only for non-grayscale images.
+            // Grayscale images use raw raster values (no ICC/sRGB conversion),
+            // so adding sRGB/gAMA would cause double-gamma correction.
+            if (!isGrayscale) {
+                // sRGB chunk — rendering intent 0 = Perceptual
+                writeChunk(fileOut, "sRGB", new byte[]{0});
+
+                // gAMA chunk — standard sRGB gamma (45455 = 1/2.2 * 100000)
+                byte[] gama = new byte[4];
+                writeInt(gama, 0, 45455);
+                writeChunk(fileOut, "gAMA", gama);
+
+                // cHRM chunk — sRGB chromaticity (values * 100000)
+                byte[] chrm = new byte[32];
+                writeInt(chrm, 0, 31270);  // white point x = 0.3127
+                writeInt(chrm, 4, 32900);  // white point y = 0.3290
+                writeInt(chrm, 8, 64000);  // red x = 0.64
+                writeInt(chrm, 12, 33000); // red y = 0.33
+                writeInt(chrm, 16, 30000); // green x = 0.30
+                writeInt(chrm, 20, 60000); // green y = 0.60
+                writeInt(chrm, 24, 15000); // blue x = 0.15
+                writeInt(chrm, 28, 6000);  // blue y = 0.06
+                writeChunk(fileOut, "cHRM", chrm);
+            }
+
             // IDAT chunk(s) — compressed scanlines
             // Filter byte (0 = None) + 2 bytes per channel per pixel
             int scanlineBytes = 1 + w * channels * 2;
             byte[] scanline = new byte[scanlineBytes];
-            // Batch row of ARGB pixels to avoid per-pixel getRGB overhead
-            int[] rowPixels = new int[w];
 
             java.util.zip.Deflater deflater = new java.util.zip.Deflater();
             try {
@@ -419,35 +444,60 @@ public class ImageIOHandler {
                 java.util.zip.DeflaterOutputStream deflaterOut =
                         new java.util.zip.DeflaterOutputStream(idatBuffer, deflater);
 
-                for (int y = 0; y < h; y++) {
-                    image.getRGB(0, y, w, 1, rowPixels, 0, w);
-                    scanline[0] = 0; // filter: None
-                    int pos = 1;
-                    for (int x = 0; x < w; x++) {
-                        int argb = rowPixels[x];
-                        int r = (argb >> 16) & 0xFF;
-                        int g = (argb >> 8) & 0xFF;
-                        int b = argb & 0xFF;
-                        // Scale 8-bit to 16-bit: v * 257 maps 0->0, 255->65535
-                        writeShort(scanline, pos, r * 257);
-                        pos += 2;
-                        writeShort(scanline, pos, g * 257);
-                        pos += 2;
-                        writeShort(scanline, pos, b * 257);
-                        pos += 2;
-                        if (hasAlpha) {
-                            int a = (argb >> 24) & 0xFF;
-                            writeShort(scanline, pos, a * 257);
+                if (isGrayscale) {
+                    // For grayscale input, read raw raster values to avoid the
+                    // ICC profile → sRGB gamma conversion that getRGB() applies.
+                    int[] rawRow = new int[w];
+                    for (int y = 0; y < h; y++) {
+                        image.getRaster().getSamples(0, y, w, 1, 0, rawRow);
+                        scanline[0] = 0; // filter: None
+                        int pos = 1;
+                        for (int x = 0; x < w; x++) {
+                            int v = rawRow[x] * 257;
+                            writeShort(scanline, pos, v);
+                            pos += 2;
+                            writeShort(scanline, pos, v);
+                            pos += 2;
+                            writeShort(scanline, pos, v);
                             pos += 2;
                         }
+                        deflaterOut.write(scanline);
+                        if (idatBuffer.size() > 65536) {
+                            deflaterOut.flush();
+                            writeChunk(fileOut, "IDAT", idatBuffer.toByteArray());
+                            idatBuffer.reset();
+                        }
                     }
-                    deflaterOut.write(scanline);
-
-                    // Flush IDAT chunks periodically to avoid large buffers
-                    if (idatBuffer.size() > 65536) {
-                        deflaterOut.flush();
-                        writeChunk(fileOut, "IDAT", idatBuffer.toByteArray());
-                        idatBuffer.reset();
+                } else {
+                    // For color images, getRGB() returns correct sRGB values.
+                    int[] rowPixels = new int[w];
+                    for (int y = 0; y < h; y++) {
+                        image.getRGB(0, y, w, 1, rowPixels, 0, w);
+                        scanline[0] = 0; // filter: None
+                        int pos = 1;
+                        for (int x = 0; x < w; x++) {
+                            int argb = rowPixels[x];
+                            int r = (argb >> 16) & 0xFF;
+                            int g = (argb >> 8) & 0xFF;
+                            int b = argb & 0xFF;
+                            writeShort(scanline, pos, r * 257);
+                            pos += 2;
+                            writeShort(scanline, pos, g * 257);
+                            pos += 2;
+                            writeShort(scanline, pos, b * 257);
+                            pos += 2;
+                            if (hasAlpha) {
+                                int a = (argb >> 24) & 0xFF;
+                                writeShort(scanline, pos, a * 257);
+                                pos += 2;
+                            }
+                        }
+                        deflaterOut.write(scanline);
+                        if (idatBuffer.size() > 65536) {
+                            deflaterOut.flush();
+                            writeChunk(fileOut, "IDAT", idatBuffer.toByteArray());
+                            idatBuffer.reset();
+                        }
                     }
                 }
 
